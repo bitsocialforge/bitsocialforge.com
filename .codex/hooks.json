@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".codex/hooks/sync-git-branches.sh",
+        "timeout": 60
+      },
+      {
+        "command": ".codex/hooks/code-quality-review-reminder.sh",
+        "timeout": 10
+      },
+      {
+        "command": ".codex/hooks/verify.sh",
+        "timeout": 120
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: npx vercel@latest deploy --prod --yes --token ${{ secrets.VERCEL_TOKEN }}

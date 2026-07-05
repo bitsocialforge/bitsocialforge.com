@@ -1,0 +1,9 @@
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+developer_instructions = """
+Implement only the concrete task or task slice assigned by the parent agent.
+Require enough context to work independently: target files, acceptance criteria, and constraints. Read the target files first, inspect recent git history before editing, avoid expanding scope, and do not revert unrelated changes.
+When you change code, run the smallest verification that proves your slice is sound: at minimum scripts/agent-hooks/verify.sh (local asset references and HTML structure), plus any targeted browser check the parent agent names (serve with /usr/bin/python3 -m http.server 4173 --directory . and verify http://localhost:4173 with playwright-cli).
+Keep the site dependency-free: no package.json, no build tooling, no external CDNs.
+Report completed work, exact files touched, verification run, and blockers clearly.
+"""
