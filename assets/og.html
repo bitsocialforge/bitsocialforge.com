@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  @font-face {
+    font-family: 'Martian Mono';
+    font-style: normal;
+    font-weight: 800;
+    src: url('../fonts/martian-mono-800.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Spline Sans Mono';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/spline-sans-mono-400.woff2') format('woff2');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px;
+    height: 630px;
+    background: #050302;
+    overflow: hidden;
+    position: relative;
+    font-family: 'Spline Sans Mono', monospace;
+  }
+  .glow {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 85% 60% at 50% 118%, rgba(255, 90, 0, 0.22), transparent 70%),
+      radial-gradient(ellipse 50% 35% at 50% 122%, rgba(255, 140, 40, 0.16), transparent 70%);
+  }
+  .scan {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(255,140,60,.03) 0 1px, transparent 1px 3px);
+  }
+  .box {
+    position: absolute;
+    left: 90px; top: 118px;
+  }
+  svg { width: 150px; height: 150px; stroke: #ff6a00; }
+  h1 {
+    font-family: 'Martian Mono', monospace;
+    font-weight: 800;
+    font-size: 64px;
+    line-height: 1.14;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    color: #ffd9ad;
+    text-shadow: 0 0 40px rgba(255, 106, 0, 0.3);
+    margin-top: 46px;
+  }
+  h1 .hot { color: #ff6a00; }
+  p {
+    margin-top: 30px;
+    font-size: 23px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #a06b3f;
+  }
+  p b { color: #ff6a00; font-weight: 400; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="scan"></div>
+  <div class="box">
+    <svg viewBox="0 0 512 512" fill="none" stroke-width="14">
+      <path d="M 292.4 81.0 Q 256.0 60.0 219.6 81.0 L 119.2 139.0 Q 82.8 160.0 82.8 202.0 L 82.8 318.0 Q 82.8 360.0 119.2 381.0 L 219.6 439.0 Q 256.0 460.0 292.4 439.0 L 392.8 381.0 Q 429.2 360.0 429.2 318.0 L 429.2 202.0 Q 429.2 160.0 392.8 139.0 Z" stroke-width="18"/>
+      <line x1="233.5" y1="143.0" x2="164.5" y2="183.0"/>
+      <line x1="278.5" y1="143.0" x2="347.5" y2="183.0"/>
+      <line x1="164.7" y1="208.7" x2="233.3" y2="247.3"/>
+      <line x1="347.3" y1="208.7" x2="278.7" y2="247.3"/>
+      <line x1="233.3" y1="272.7" x2="164.7" y2="311.3"/>
+      <line x1="278.7" y1="272.7" x2="347.3" y2="311.3"/>
+      <line x1="164.5" y1="337.0" x2="233.5" y2="377.0"/>
+      <line x1="347.5" y1="337.0" x2="278.5" y2="377.0"/>
+      <circle cx="256" cy="130" r="26"/>
+      <circle cx="142" cy="196" r="26"/>
+      <circle cx="370" cy="196" r="26"/>
+      <circle cx="256" cy="260" r="26"/>
+      <circle cx="142" cy="324" r="26"/>
+      <circle cx="370" cy="324" r="26"/>
+      <circle cx="256" cy="390" r="26"/>
+    </svg>
+    <h1>Accelerate peer-to-peer<br /><span class="hot">social media</span></h1>
+    <p><b>⬢</b> Bitsocial Forge Inc.</p>
+  </div>
+</body>
+</html>
