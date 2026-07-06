@@ -6,7 +6,8 @@ Use this playbook for anything touching production hosting or DNS. Update it if 
 
 - Production is the **Vercel project `bitsocialforge-com`** (team `toms-projects-2188af94`), deployed from the GitHub repo `bitsocialforge/bitsocialforge.com` (private, default branch `master`).
 - **Every push to `master` auto-deploys production** via the GitHub Actions workflow `.github/workflows/deploy.yml`, which runs `vercel deploy --prod` with the `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` repo secrets. The Vercel GitHub App is NOT installed on the `bitsocialforge` org; if it ever is, the native integration can replace this workflow (delete the workflow and secrets in the same change, and update this playbook).
-- There is no build step: Vercel serves the repo as static files (`index.html`, `styles.css`, `fonts/`, `assets/`). `www` redirects to the apex via `vercel.json`.
+- Vercel builds the Vite app with `corepack yarn build` and serves the generated `dist` directory. `www` redirects to the apex via `vercel.json`.
+- The GitHub Actions deploy workflow installs with `corepack yarn install --immutable`, then runs `type-check`, `lint`, and `build` before invoking `vercel deploy --prod`.
 - Because pushes go straight to production, keep `master` releasable and verify locally before pushing (see the Verification Rules in `AGENTS.md`).
 - The `vercel` CLI is authenticated as `tomcasaburi`.
 

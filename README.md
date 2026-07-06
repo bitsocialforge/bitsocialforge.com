@@ -8,11 +8,23 @@ Bitsocial RPC service.
 
 ## Stack
 
-Dependency-free static site: plain HTML + CSS, self-hosted fonts
-(Martian Mono, Spline Sans Mono), no build step.
+Static React + TypeScript site built with Vite, using Yarn 4 and Node 22.12.0
+to stay aligned with 5chan and adjacent Bitsocial projects. Fonts are
+self-hosted (Martian Mono, Spline Sans Mono), with global styling in
+`styles.css`.
 
 ```bash
-/usr/bin/python3 -m http.server 4173 --directory .   # http://localhost:4173
+corepack enable
+corepack yarn install
+corepack yarn start   # http://localhost:4173
+```
+
+Useful checks:
+
+```bash
+corepack yarn type-check
+corepack yarn lint
+corepack yarn build
 ```
 
 ## Deploy

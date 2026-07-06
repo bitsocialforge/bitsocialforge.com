@@ -11,9 +11,23 @@ if [ "${1:-}" = "--advisory" ]; then
   shift
 fi
 
-cat > /dev/null
+input="$(cat)"
+
+# Avoid infinite stop loops: when a previous blocking verify already forced the
+# agent to continue, Claude Code/Codex set stop_hook_active on the next Stop.
+if command -v jq >/dev/null 2>&1; then
+  if [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ]; then
+    exit 0
+  fi
+fi
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" || exit 0
+
+# Read-only sessions change nothing; skip full verification.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+  echo "Working tree clean; skipping verification."
+  exit 0
+fi
 
 run_required_check() {
   local label="$1"
@@ -63,11 +77,15 @@ for line, ref in collector.refs:
     if ref.startswith(("http://", "https://", "mailto:", "#", "tel:", "data:", "//")):
         continue
     path = urllib.parse.urlparse(ref).path
+    if path.startswith("/_vercel/"):
+        continue
     local = path.lstrip("/")
     if local == "" or local.endswith("/"):
         local = os.path.join(local, "index.html")
     checked += 1
-    if not os.path.isfile(local):
+    # Absolute URLs may resolve to Vite public/ passthrough files or to
+    # source files in the project root.
+    if not (os.path.isfile(os.path.join("public", local)) or os.path.isfile(local)):
         failures.append(f"index.html:{line}: local reference does not resolve: {ref}")
 
 for failure in failures:
@@ -98,7 +116,10 @@ for css in ("styles.css", "fonts/fonts.css"):
                     continue
                 path = ref.split("#", 1)[0].split("?", 1)[0]
                 if path.startswith("/"):
+                    # Absolute URLs may resolve to Vite public/ passthrough files.
                     target = path.lstrip("/")
+                    if os.path.isfile(os.path.join("public", target)):
+                        target = os.path.join("public", target)
                 else:
                     target = os.path.normpath(os.path.join(base, path))
                 checked += 1
@@ -110,6 +131,21 @@ for failure in failures:
 print(f"checked {checked} url() reference(s)")
 sys.exit(1 if failures else 0)
 PY
+}
+
+check_public_files_in_dist() {
+  local missing=0
+  while IFS= read -r file; do
+    local rel="${file#public/}"
+    if [ ! -f "dist/$rel" ]; then
+      echo "public/$rel was not copied into dist/"
+      missing=1
+    fi
+  done < <(find public -type f 2>/dev/null)
+  if [ "$missing" -ne 0 ]; then
+    return 1
+  fi
+  echo "all public/ files present in dist/"
 }
 
 check_html_structure() {
@@ -171,11 +207,16 @@ sys.exit(1 if checker.errors else 0)
 PY
 }
 
-echo "Running local asset reference checks and HTML structure sanity check..."
+echo "Running Vite/TypeScript checks, local asset reference checks, and HTML structure sanity check..."
 echo ""
 
 failures=0
 
+run_required_check "Yarn dependencies install cleanly" corepack yarn install --immutable || failures=1
+run_required_check "TypeScript check passes" corepack yarn type-check || failures=1
+run_required_check "Oxlint passes" corepack yarn lint || failures=1
+run_required_check "Vite build passes" corepack yarn build || failures=1
+run_required_check "public/ passthrough files land in dist/" check_public_files_in_dist || failures=1
 run_required_check "index.html local href/src references resolve" check_html_local_refs || failures=1
 run_required_check "styles.css and fonts/fonts.css url(...) references resolve" check_css_url_refs || failures=1
 run_required_check "index.html tag structure sanity (html.parser)" check_html_structure || failures=1

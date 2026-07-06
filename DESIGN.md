@@ -33,7 +33,7 @@ Heat metaphor governs intensity: hotter = brighter = more important
 
 - Logo: rounded hexagon containing a 7-node network graph, hollow circles,
   orange strokes only, no fills. Lines are trimmed at circle edges so nodes
-  stay hollow. Inline SVG in header/footer, standalone in `assets/`.
+  stay hollow. Inline SVG in header/footer, standalone in `public/assets/`.
 - Heat-rule dividers: horizontal 1px gradient (dark red → ember → white-hot
   center), like heated steel.
 - Rising ember particles: fixed-position CSS-only animation, subtle, disabled
@@ -59,5 +59,6 @@ Heat metaphor governs intensity: hotter = brighter = more important
 ## Hard Rules
 
 - Black background, orange monospace type. No cool colors, no white surfaces.
-- No external assets, CDNs, trackers, or JS frameworks.
+- Keep the app static and self-contained: no external assets, CDNs, new trackers, backend runtime, authentication, or data-submitting forms. Existing Vercel analytics is the only approved deployment telemetry.
+- React components should stay typed with TypeScript and preserve the semantic structure of the page.
 - Never restyle the logo as solid/filled; hollow strokes only.

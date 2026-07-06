@@ -1,6 +1,6 @@
 ---
 name: review-and-merge-pr
-description: Review an open GitHub pull request, inspect bot and human feedback, decide which findings are valid, implement fixes on the PR branch, and merge the PR into master when it is ready. Use when the user says "check the PR", "address review comments", "review PR feedback", or "merge this PR".
+description: Review an open GitHub pull request, inspect bot, CI, and human feedback, decide which findings are valid, implement fixes on the PR branch, merge the PR into master when it is ready, and finalize any linked GitHub issue after merge. Use when the user says "check the PR", "address review comments", "review PR feedback", or "merge this PR".
 ---
 
 # Review And Merge PR
@@ -10,6 +10,7 @@ description: Review an open GitHub pull request, inspect bot and human feedback,
 Use this skill after a feature branch already has an open PR into `master`.
 Stay on the PR branch, treat review bots as input rather than authority, and only merge once the branch is verified and the remaining comments are either fixed, explicitly deferred, or explicitly declined with a reason.
 Do not let repeated nitpicks, speculative future-work comments, or low-value bot suggestions keep the PR open once they have been triaged as non-blocking.
+Finish the workflow by cleaning up local git state yourself; do not assume GitHub, `gh pr merge --delete-branch`, or GitHub Desktop removed the local feature branch or any local `pr/<number>` alias.
 
 ## Workflow
 
@@ -17,7 +18,7 @@ Do not let repeated nitpicks, speculative future-work comments, or low-value bot
 
 Prefer the PR for the current branch when the branch is not `master`.
 If the current branch is `master`, inspect open PRs and choose the one that matches the user request.
-If there is no open PR yet, stop and tell the parent agent there is nothing to merge yet.
+If there is no open PR yet, stop and use `make-closed-issue` first.
 
 Useful commands:
 
@@ -52,7 +53,7 @@ Focus on comments from:
 
 Sort feedback into these buckets:
 
-- `must-fix`: correctness bugs, broken behavior, crashes, security issues, test or build failures, reproducible regressions
+- `must-fix`: correctness bugs, broken behavior, crashes, security issues, test failures, broken deploy checks, or reproducible regressions
 - `should-fix`: clear maintainability or edge-case issues with concrete evidence
 - `defer`: real but non-blocking follow-up work that can land later without making this PR unsafe to merge
 - `decline`: false positives, stale comments, duplicate findings, speculative style-only suggestions, feedback already addressed in newer commits, or nitpicks that are not worth blocking merge
@@ -61,9 +62,11 @@ Rules:
 
 - Never merge with unresolved `must-fix` findings.
 - Do not accept a bot finding without reading the relevant code and diff.
+- When delegating verification of a finding or fix to a subagent, give it only the artifact and the contract it must satisfy, not your triage verdict or reasoning, so its conclusion stays independent.
 - `should-fix` and `defer` findings are not merge blockers by default; use judgment and prefer merging once the branch is safe, verified, and the remaining comments are low-value or future work.
 - If a finding is ambiguous but high-risk, ask the user before merging.
 - If a comment is wrong, stale, or intentionally deferred, explain that briefly in the PR or merge summary rather than silently ignoring it.
+- After triaging a comment as `defer` or `decline`, do not keep reopening the same discussion unless new evidence appears or the user explicitly asks for a follow-up pass.
 
 ### 4. Work on the PR branch and keep the PR updated
 
@@ -77,14 +80,14 @@ git switch <head-branch>
 git fetch origin <head-branch>
 git status --short --branch
 git add <files>
-git commit --no-verify -m "fix(scope): address review feedback"
+git commit -m "fix(scope): address review feedback"
 git push
 ```
 
 After code changes, follow repo verification rules from `AGENTS.md`:
 
-- run `scripts/agent-hooks/verify.sh < /dev/null` (local asset references and HTML structure)
-- for UI or visual changes, serve the site (`/usr/bin/python3 -m http.server 4173 --directory .`) and use `playwright-cli` across `chrome`, `firefox`, and `webkit` at `http://localhost:4173`, checking console errors plus desktop and 375px mobile layouts
+- run `scripts/agent-hooks/verify.sh < /dev/null` for local asset references and HTML structure
+- for UI or visual changes, serve the site with `corepack yarn start` and use `playwright-cli` across `chrome`, `firefox`, and `webkit` at `http://localhost:4173`, checking console errors plus desktop and 375px mobile layouts
 
 ### 5. Report back on the PR before merging
 
@@ -114,7 +117,45 @@ Preferred merge command:
 gh pr merge <pr-number> --repo bitsocialforge/bitsocialforge.com --squash --delete-branch
 ```
 
-### 7. Clean up local state after merge
+### 7. Finalize linked issues
+
+After merge, inspect the PR's linked closing issues.
+For every linked issue, bring it into the final state expected from `make-closed-issue`:
+
+- closed
+- assigned to the current GitHub user
+
+Before editing issue assignees, determine the current contributor's GitHub username from the authenticated `gh` session.
+If `gh` is not signed in or cannot resolve the login, stop and ask the contributor for their GitHub username before proceeding.
+If the PR has no linked issue, explicitly tell the user that there was no associated issue to finalize.
+
+Useful commands:
+
+```bash
+GH_LOGIN=$(gh api user --jq '.login' 2>/dev/null || true)
+
+if [ -z "$GH_LOGIN" ]; then
+  echo "GitHub username could not be determined from gh auth. Ask the contributor for their GitHub username before proceeding."
+  exit 1
+fi
+
+ISSUE_NUMBERS=$(gh pr view <pr-number> --repo bitsocialforge/bitsocialforge.com --json closingIssuesReferences --jq '.closingIssuesReferences[].number')
+
+if [ -n "$ISSUE_NUMBERS" ]; then
+  for ISSUE_NUMBER in $ISSUE_NUMBERS; do
+    ISSUE_STATE=$(gh issue view "$ISSUE_NUMBER" --repo bitsocialforge/bitsocialforge.com --json state --jq '.state')
+    if [ "$ISSUE_STATE" != "CLOSED" ]; then
+      gh issue close "$ISSUE_NUMBER" --repo bitsocialforge/bitsocialforge.com
+    fi
+
+    if ! gh issue view "$ISSUE_NUMBER" --repo bitsocialforge/bitsocialforge.com --json assignees --jq '.assignees[].login' | grep -qx "$GH_LOGIN"; then
+      gh issue edit "$ISSUE_NUMBER" --repo bitsocialforge/bitsocialforge.com --add-assignee "$GH_LOGIN"
+    fi
+  done
+fi
+```
+
+### 8. Clean up local state after merge
 
 After the PR is merged:
 
@@ -126,6 +167,10 @@ git branch -D <head-branch> 2>/dev/null || true
 git branch -D "pr/<pr-number>" 2>/dev/null || true
 ```
 
+This cleanup is required even when the remote branch was deleted automatically or the merge happened in GitHub Desktop or the GitHub web UI.
+Remote deletion only removes the remote branch; it does not remove the local feature branch, the local `pr/<number>` checkout alias, or stale remote-tracking refs in your clone.
+Use `-D` rather than `-d` here because squash merges usually leave the local branch looking unmerged by ancestry even when the PR is already merged and safe to remove.
+
 If the PR branch lived in a dedicated worktree, remove that worktree after leaving it:
 
 ```bash
@@ -133,7 +178,7 @@ git worktree list
 git worktree remove /path/to/worktree
 ```
 
-### 8. Report the outcome
+### 9. Report the outcome
 
 Tell the user:
 
@@ -142,5 +187,7 @@ Tell the user:
 - which findings were declined and why
 - which verification commands ran
 - whether the PR was merged
+- whether linked issues were confirmed closed
+- whether linked issues were assigned to the current GitHub user
 - whether stale remote-tracking refs were pruned
-- whether the feature branch, any local `pr/<number>` alias, and any worktree were cleaned up
+- whether the feature branch, local `pr/<number>` alias, and any worktree were cleaned up

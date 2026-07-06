@@ -1,42 +1,58 @@
 # Skills and Tools
 
-Use this playbook when setting up/adjusting skills and external tooling.
+Use this playbook when setting up or adjusting skills and external tooling, or to discover what is already committed.
 
-## Installed Skills
+## Committed Skills Index
 
-The same skill set is installed in `.claude/skills/`, `.cursor/skills/`, and `.codex/skills/`. Keep the three copies aligned when changing any of them. Most were transferred and adapted from the `bitsocial-web` repo's AI workflow tooling; repo-specific steps (build commands, repo slugs, dev URLs) were rewritten for this static site.
+These live in `.claude/skills/`, `.cursor/skills/`, and `.codex/skills/` (mirrored; run `node scripts/validate-ai-workflow.mjs` after edits). Repo skill files are committed; runtime app dependencies still install through Yarn.
 
-| Skill                 | Purpose                                                                          |
-| --------------------- | -------------------------------------------------------------------------------- |
-| `commit`              | Review diffs, split into logical commits, write Conventional Commit messages      |
-| `commit-format`       | Output format for commit message suggestions                                      |
-| `issue-format`        | Output format for GitHub issue suggestions                                        |
-| `make-closed-issue`   | Create an issue for completed work, commit, and close it with the commit hash     |
-| `deslop`              | Remove AI-generated slop from the current diff                                    |
-| `find-skills`         | Discover/install skills from the open ecosystem (`npx skills`)                    |
-| `fix-merge-conflicts` | Resolve merge conflicts non-interactively and re-verify                           |
-| `impeccable`          | Frontend design entry point with design subcommands (`/impeccable`)               |
-| `frontend-design`     | Distinctive, production-grade frontend design guidance for net-new pages/sections |
-| `code-quality-review` | Advisory pre-push/pre-PR quality review of the current diff                       |
-| `readme`              | Generate thorough project documentation                                           |
-| `refactor-pass`       | Simplicity-focused cleanup pass after recent changes                              |
-| `review-and-merge-pr` | Triage PR feedback, fix valid findings, merge when ready                          |
-| `playwright-cli`      | Browser automation for UI verification                                            |
-| `context7`            | Up-to-date library documentation lookups via the Context7 API                     |
-| `debug-agent`         | Evidence-based debugging with runtime NDJSON logs                                 |
-| `implement-plan`      | Orchestrate a multi-task plan with `plan-implementer` subagents                   |
+| Skill | Use when |
+| ----- | -------- |
+| `commit` | Committing current work with logical scoped commits |
+| `commit-format` / `issue-format` | Formatting commit or issue suggestions in chat output |
+| `make-closed-issue` | Creating an issue plus review branch and PR into `master` for already-done work |
+| `review-and-merge-pr` | Triaging bot, CI, and human PR feedback, fixing valid findings, merging, and cleaning up |
+| `fix-merge-conflicts` | Resolving merge conflicts non-interactively and validating the Vite site |
+| `code-quality-review` | Advisory pre-push/pre-PR quality pass on the current diff |
+| `refactor-pass` | Simplicity-focused refactor of recent changes |
+| `deslop` | Removing AI-generated slop from the branch diff |
+| `debug-agent` | Evidence-based debugging with runtime logs |
+| `frontend-design` | Distinctive, production-grade frontend design guidance for net-new pages or sections |
+| `impeccable` | Frontend design entry point with design subcommands (`/impeccable`) |
+| `playwright-cli` | Browser automation and cross-engine UI verification |
+| `implement-plan` | Executing a multi-task plan via `plan-implementer` subagents |
+| `readme` | Creating or updating README.md |
+| `context7` | Fetching up-to-date library docs |
+| `find-skills` | Discovering or installing ecosystem skills |
+
+## Committed Subagents
+
+Defined in `.claude/agents/*.md`, `.cursor/agents/*.md`, `.codex/agents/*.toml` plus `.codex/config.toml` entries:
+
+- `browser-check`
+- `code-quality`
+- `plan-implementer`
+
+Read the agent file before spawning one directly.
 
 ## Playwright CLI
 
-Use `playwright-cli` for browser automation (navigation, interaction, screenshots, extraction).
+Use `playwright-cli` for browser automation: navigation, interaction, screenshots, tests, and extraction.
 
-The local dev URL is `http://localhost:4173` — start the static server first if needed:
+The local dev URL is `http://localhost:4173`. Start the Vite dev server first if needed:
 
 ```bash
-/usr/bin/python3 -m http.server 4173 --directory .
+corepack yarn start
 ```
 
-When using `playwright-cli` for repo UI verification, do not stop after one engine. Run the relevant flow in all three main browser engines:
+Default to a fresh isolated browser session for normal verification. If the task depends on the contributor's existing browser state, ask whether they want:
+
+- a fresh isolated `playwright-cli` session
+- their current browser session reused
+
+Do not attach to a live personal browser session without explicit confirmation.
+
+When using `playwright-cli` for repo UI verification, run the relevant flow in all three main browser engines:
 
 - `chrome` for Blink
 - `firefox` for Gecko
@@ -55,6 +71,7 @@ Avoid GitHub MCP and browser MCP servers for this project because they add signi
 
 - GitHub operations: use `gh` CLI.
 - Browser operations: use `playwright-cli`.
+- If current browser reuse is needed, keep using Playwright-based attach paths rather than browser MCP servers.
 
 ## Model Availability
 

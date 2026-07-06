@@ -64,7 +64,7 @@ When a subagent reports PARTIAL or FAILED:
 After all batches complete:
 
 1. Run `scripts/agent-hooks/verify.sh < /dev/null` to confirm local asset references resolve and the HTML structure is intact
-2. For UI changes, serve the site (`/usr/bin/python3 -m http.server 4173 --directory .`) and verify in the browser with `playwright-cli` across `chrome`, `firefox`, and `webkit` at `http://localhost:4173`, checking console errors plus desktop and 375px mobile layouts
+2. For UI changes, serve the site (`corepack yarn start`) and verify in the browser with `playwright-cli` across `chrome`, `firefox`, and `webkit` at `http://localhost:4173`, checking console errors plus desktop and 375px mobile layouts
 
 ### 6. Report
 

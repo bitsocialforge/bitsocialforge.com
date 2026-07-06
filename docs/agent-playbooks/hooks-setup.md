@@ -1,38 +1,46 @@
 # Agent Hooks Setup
 
-If your AI coding assistant supports lifecycle hooks, configure these for this repo.
+This repo ships lifecycle hooks shared across Claude Code, Cursor, and Codex. The implementations live in `scripts/agent-hooks/`; each harness has thin wrappers in `.claude/hooks/`, `.cursor/hooks/`, `.codex/hooks/` plus its own entry-point config. Run `node scripts/validate-ai-workflow.mjs` after changing any of this.
 
-## Recommended Hooks
+## Hooks
 
-| Hook   | Command                                                | Purpose                                                                                            |
-| ------ | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `stop` | `scripts/agent-hooks/sync-git-branches.sh`             | Prune stale refs and delete integrated temporary task branches                                      |
-| `stop` | `scripts/agent-hooks/code-quality-review-reminder.sh`  | Remind the agent to run the advisory `code-quality-review` skill when reviewable files changed      |
-| `stop` | `scripts/agent-hooks/verify.sh`                        | Hard-gate static-site verification: local asset references resolve and `index.html` structure is intact |
+| Stop hook | Script | Purpose |
+| --------- | ------ | ------- |
+| stop | `scripts/agent-hooks/sync-git-branches.sh` | Prune stale refs and delete integrated temporary task branches |
+| stop | `scripts/agent-hooks/code-quality-review-reminder.sh` | Remind the agent to run the advisory `code-quality-review` skill when reviewable files changed |
+| stop | `scripts/agent-hooks/verify.sh` | Hard-gate Vite site verification: dependencies install, TypeScript/lint/build pass, and local assets resolve |
 
-There is no `afterFileEdit` hook in this repo: there is no formatter, no dependency install step, and no framework-specific pattern review for a plain HTML + CSS site.
+There is no edit-time hook in this repo. Formatting and TypeScript checks run through the shared verification path when reviewable files change.
 
-## Why
+## Entry Points
 
-- Broken `href`/`src`/`url(...)` references and malformed HTML are caught before the agent finishes
-- Reviewable diffs get an explicit advisory quality pass before push/PR
-- Temporary task branches stay aligned with the repo's branch workflow
-- One shared hook implementation for Codex, Cursor, and Claude
+The three harnesses wire the same scripts but use different config files and schemas. Do not copy one harness's schema to another.
 
-## What verify.sh Checks
+| Harness | Entry point | Schema | Stop event |
+| ------- | ----------- | ------ | ---------- |
+| Claude Code | `hooks` key in `.claude/settings.json` | Claude hooks schema; standalone `.claude/hooks.json` is not read | `Stop` |
+| Cursor | `.cursor/hooks.json` | `{"version": 1, "hooks": {...}}` with Cursor event names | `stop` |
+| Codex | `.codex/hooks.json` | Codex hooks schema, intentionally Claude-compatible with `type: "command"` | `Stop` |
 
-`scripts/agent-hooks/verify.sh` uses the system python (`/usr/bin/python3`) and checks:
+## What `verify.sh` Checks
 
-1. Every local `href`/`src` referenced in `index.html` (skipping `http`/`https`/`mailto`/`#` links) resolves to an existing file in the repo.
-2. Every `url(...)` referenced in `styles.css` and `fonts/fonts.css` resolves.
-3. `index.html` has no malformed tag structure (checked with `html.parser`).
+`scripts/agent-hooks/verify.sh` runs the repo's Vite/TypeScript checks and uses the system python (`/usr/bin/python3`) only for small local reference parsers. It checks:
 
-By default the script exits non-zero when a required check fails (exit code 2 with `Verification failed.` on stderr, so hook-aware agents treat it as blocking). Set `AGENT_VERIFY_MODE=advisory` or pass `--advisory` only when you intentionally need signal from a broken tree without blocking the session.
+1. `corepack yarn install --immutable`
+2. `corepack yarn type-check`
+3. `corepack yarn lint`
+4. `corepack yarn build`
+5. Every file under `public/` was copied into `dist/` by the build.
+6. Every local `href`/`src` referenced in `index.html` resolves to an existing file in the repo (checking `public/` for absolute paths), excluding Vercel-managed `/_vercel/*` runtime paths.
+7. Every `url(...)` referenced in `styles.css` and `fonts/fonts.css` resolves.
+8. `index.html` has no malformed tag structure.
 
-Lifecycle hooks do not replace manual browser verification. For UI or visual changes, still serve the site (`/usr/bin/python3 -m http.server 4173 --directory .`) and run `playwright-cli` checks across `chrome`, `firefox`, and `webkit`, plus a 375px mobile viewport flow in each engine when responsiveness changed.
+In strict mode, failures exit `2` so hook-aware agents treat them as blocking. The script checks `stop_hook_active` to avoid infinite stop loops and skips when the working tree is clean. Set `AGENT_VERIFY_MODE=advisory` or pass `--advisory` only when you intentionally need signal from a broken tree without blocking the session.
 
-## Hook Wiring
+Lifecycle hooks do not replace manual browser verification. For UI or visual changes, still run `corepack yarn start` and use `playwright-cli` checks across `chrome`, `firefox`, and `webkit`, plus a 375px mobile viewport flow in each engine when responsiveness changed.
 
-Configure hook wiring according to your agent tool docs (`hooks.json`, equivalent, etc.). In this repo, `.claude/hooks.json`, `.cursor/hooks.json`, and `.codex/hooks.json` all register the same three `stop` hooks.
+## Editing Rules
 
-`.claude/hooks/*.sh`, `.cursor/hooks/*.sh`, and `.codex/hooks/*.sh` should stay as thin wrappers that delegate to the shared implementations under `scripts/agent-hooks/`.
+- Change behavior in `scripts/agent-hooks/*.sh`; keep the per-harness wrappers as thin `exec` delegates.
+- When adding a hook, wire it in all three entry points or add a documented exemption in `scripts/validate-ai-workflow.mjs`.
+- Do not paste example hook implementations into docs; link the real scripts so they cannot drift.

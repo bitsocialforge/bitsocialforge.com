@@ -1,0 +1,30 @@
+{
+  "name": "bitsocialforge.com",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "yarn@4.13.0",
+  "scripts": {
+    "start": "vite --host 127.0.0.1 --port 4173",
+    "dev": "corepack yarn start",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "type-check": "tsc --noEmit",
+    "lint": "oxlint src/**/*.{ts,tsx}",
+    "format": "oxfmt src/**/*.{ts,tsx}"
+  },
+  "dependencies": {
+    "@vercel/analytics": "2.0.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "oxfmt": "0.57.0",
+    "oxlint": "1.72.0",
+    "typescript": "6.0.3",
+    "vite": "8.1.3"
+  }
+}

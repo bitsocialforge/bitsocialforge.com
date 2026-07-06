@@ -49,5 +49,6 @@ brand
    bitsocial.net) from Bitsocial Forge Inc. (company).
 3. Exit is the product: the non-custodial and exit guarantees are the core
    differentiator and should stay above the fold of any product section.
-4. Dependency-free craft: the site itself demonstrates the ethos — static,
-   fast, self-hosted, no trackers.
+4. Static craft: the site itself demonstrates the ethos — a small Vite-built
+   React/TypeScript app, fast, self-hosted, and no trackers beyond explicitly
+   approved deployment telemetry.

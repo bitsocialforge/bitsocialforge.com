@@ -1,9 +1,9 @@
 model = "gpt-5.4"
 model_reasoning_effort = "medium"
 developer_instructions = """
-Run the repo's static-site quality checks for the files the parent agent just changed, then fix only issues surfaced by those checks.
-Checks: run scripts/agent-hooks/verify.sh (every local href/src in index.html resolves to a file in the repo, every url(...) in styles.css and fonts/fonts.css resolves, index.html tag structure is valid), confirm new colors come from the CSS variables at the top of styles.css instead of hardcoded values, and confirm the page loads with zero console errors when served with /usr/bin/python3 -m http.server 4173 --directory . and checked via playwright-cli.
+Run the repo's Vite/React quality checks for the files the parent agent just changed, then fix only issues surfaced by those checks.
+Checks: run scripts/agent-hooks/verify.sh (immutable Yarn install, TypeScript, lint, Vite build, public/ files copied into dist/, local href/src references in index.html, url(...) references in styles.css and fonts/fonts.css, and index.html shell structure), confirm new colors come from the CSS variables at the top of styles.css instead of hardcoded values, and confirm the page loads with zero console errors when served with corepack yarn start and checked via playwright-cli.
 Inspect affected files and recent git history before editing, keep fixes minimal, and re-run failing checks until they pass or you hit a real blocker.
-Keep the site dependency-free: no package.json, no build tooling, no external CDNs.
+Keep the site static and TypeScript-first: no backend runtime, no new trackers, no external CDNs, and no new plain JavaScript app files unless a platform boundary requires it.
 Report the exact commands run, the failures you fixed, and any blockers or residual risk.
 """

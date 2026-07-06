@@ -16,14 +16,17 @@ Only record items that are repo-specific, likely to recur, and have a concrete m
 
 bitsocialforge.com is the company website for **Bitsocial Forge Inc.**, the
 infrastructure company executing Phase 1 of the Bitsocial master plan. It is a
-dependency-free static site (plain HTML + CSS, no build step) deployed on
-Vercel, with DNS on Cloudflare.
+static React + TypeScript site built with Vite, deployed on Vercel, with DNS on
+Cloudflare.
 
-- `index.html` — the single landing page
-- `styles.css` — the entire visual system
+- `index.html` — Vite HTML shell, metadata, and analytics bootstrap
+- `src/` — React + TypeScript application code
+- `styles.css` — global visual system and CSS variables
 - `fonts/` — self-hosted woff2 fonts (Martian Mono, Spline Sans Mono) + `fonts.css`
-- `assets/` — logo, favicon, OG image
-- `vercel.json` — static hosting config
+- `public/` — passthrough files copied verbatim into the build (`robots.txt`, `sitemap.xml`, and `public/assets/` with logo, favicon, OG image)
+- `package.json` / `yarn.lock` — Yarn-managed React/Vite/TypeScript toolchain
+- `vite.config.ts` / `tsconfig.json` — Vite and TypeScript config
+- `vercel.json` — Vite build + static hosting config
 
 Related repos: `forge-rpc` (first product, private), `bitsocial-web` (protocol
 landing/docs sites, public). The company is distinct from the open Bitsocial
@@ -58,7 +61,7 @@ Use compiled context for orientation, not as source of truth.
 
 Source of truth:
 
-- `index.html`, `styles.css`, asset files, and runtime/live evidence when relevant.
+- `src/**`, `index.html`, `styles.css`, `package.json`, Vite/TypeScript config, asset files, and runtime/live evidence when relevant.
 
 Compiled context:
 
@@ -72,13 +75,13 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 | Situation | Required action |
 | --------- | --------------- |
 | Frontend UI design, redesign, critique, audit, polish, layout, typography, color, motion, or visual hierarchy work | Use the `impeccable` skill (one entry point with design subcommands under `/impeccable`); for net-new pages or sections, use the `frontend-design` skill first |
-| UI or visual behavior changed | Verify in a real browser (local static server) — check console errors, all local asset URLs resolve, and mobile (375px) plus desktop layouts |
+| UI or visual behavior changed | Verify in a real browser (`corepack yarn start`) — check console errors, failed local asset requests, and mobile (375px) plus desktop layouts |
 | Public-facing copy changed | Re-check the Brand and Content Rules above; keep `<title>`, meta description, and OG tags consistent with the new copy |
 | New reviewable feature, fix, docs change, or chore started while on `master` | Create a short-lived `codex/feature/*`, `codex/fix/*`, `codex/docs/*`, or `codex/chore/*` branch from `master` before editing |
 | New unrelated task started while another task branch is checked out | Create a separate worktree from `master` with a descriptive name; one active task branch per worktree |
 | Open PR needs feedback triage or merge readiness check | Use the `review-and-merge-pr` skill |
 | Before pushing or opening a PR | Run the advisory `code-quality-review` skill on the current diff; treat findings as suggestions, not blockers |
-| Repo AI workflow files changed (`.codex/**`, `.cursor/**`, `.claude/**`, `AGENTS.md`, `docs/agent-playbooks/**`, `scripts/agent-hooks/**`) | Keep the Codex, Cursor, and Claude copies aligned when they represent the same workflow; update `AGENTS.md` if the default agent policy changes |
+| Repo AI workflow files changed (`.codex/**`, `.cursor/**`, `.claude/**`, `AGENTS.md`, `docs/agent-playbooks/**`, `scripts/agent-hooks/**`) | Keep the Codex, Cursor, and Claude copies aligned when they represent the same workflow; run `node scripts/validate-ai-workflow.mjs`; update `AGENTS.md` if the default agent policy changes |
 | GitHub operation needed | Use `gh` CLI, not GitHub MCP |
 | User asks for commit or issue phrasing | Use `docs/agent-playbooks/commit-issue-format.md` |
 | Bug report in a specific file/line | Start with a git history scan (`git log --oneline`, `git blame`, scoped `git show`) before editing |
@@ -86,20 +89,23 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 
 ## Stack
 
-- Plain HTML5 + CSS. No JavaScript unless a feature genuinely requires it, and no frameworks or build tooling without an explicit user request.
+- React 19 + TypeScript + Vite 8, managed with Yarn 4 (`nodeLinker: node-modules`) and Node 22.12.0 to stay close to 5chan and adjacent Bitsocial projects.
+- TypeScript is the default for new source files. Use `.tsx` for React components and `.ts` for non-component code; do not add plain `.js` app code unless a dependency or platform boundary requires it.
+- Keep the site a static client app: no backend runtime, no server-side rendering, no forms that submit data, no wallet integration, and no authentication in this repo.
 - Self-hosted fonts only (`fonts/*.woff2` via `fonts/fonts.css`). No external CDNs, trackers, or analytics without an explicit user request.
-- Vercel static hosting; every push to `master` on `bitsocialforge/bitsocialforge.com` auto-deploys production.
+- Vercel static hosting builds `dist` from Vite; every push to `master` on `bitsocialforge/bitsocialforge.com` auto-deploys production.
 - Cloudflare DNS (DNS-scope API token lives outside the repo; never commit credentials).
 
 ## Core MUST Rules
 
-### Static Site Rules
+### Frontend Rules
 
-- Keep the site dependency-free: no `package.json`, no `node_modules`, no build step, unless the user explicitly asks to introduce one.
+- Keep dependencies minimal and intentional. Do not add frameworks, routers, state libraries, CSS-in-JS, component libraries, analytics, or runtime services unless the task truly needs them.
+- Keep `package.json`, `yarn.lock`, `.yarnrc.yml`, and Vite/TypeScript config in sync when the toolchain changes.
 - Keep all styling in `styles.css` driven by the CSS variables at the top of the file. Do not hardcode colors in markup or introduce a parallel styling layer.
 - Preserve `prefers-reduced-motion` fallbacks whenever you add or change animation.
 - Keep the site fully self-contained: every `href`/`src` to a local asset must resolve to a file in the repo.
-- Keep semantic HTML and accessibility affordances (landmarks, `aria-label`s, focus-visible styles, alt text) intact when editing markup.
+- Keep semantic HTML and accessibility affordances (landmarks, `aria-label`s, focus-visible styles, alt text) intact when editing React markup.
 
 ### Git Workflow Rules
 
@@ -112,7 +118,8 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 ### Verification Rules
 
 - Never mark work complete without verification.
-- Serve the site locally (`/usr/bin/python3 -m http.server 4173 --directory .` or any static server) and load it in a real browser.
+- For code changes, run `corepack yarn install --immutable`, `corepack yarn type-check`, `corepack yarn lint`, and `corepack yarn build`.
+- Serve the site locally with `corepack yarn start` and load it in a real browser.
 - After UI changes, check: zero console errors, no failed local asset requests, desktop and 375px mobile layouts, and dark/ember theme integrity.
 - If verification fails, fix and re-run until passing or until you hit a real blocker you can explain concretely.
 
@@ -126,8 +133,10 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 - Treat `.codex/`, `.cursor/`, and `.claude/` as repo-managed contributor tooling, not private scratch space.
 - Do not add or use a repo-level `.agents/` directory. Keep skills in `.codex/skills/`, `.cursor/skills/`, and `.claude/skills/` only.
 - Keep equivalent workflow files aligned across all toolchains when their directories contain the same skill, hook, or agent.
+- Keep shared behavior equivalent while preserving harness-specific models, config formats, hook entry points, and tool invocation syntax.
 - Keep model names toolchain-specific: `composer-2` is Cursor-only and must not appear under `.claude/` or `.codex/`; `.codex/agents/**` should use `gpt-5.4` by default. Do not use `gpt-5.3-codex` or `gpt-5.3-codex-spark` in `.codex/`.
-- Review `.codex/config.toml`, `.cursor/hooks.json`, and `.claude/hooks.json` before changing agent orchestration or hook behavior, because they are the entry points contributors will actually load.
+- Hook entry points are harness-specific: the `hooks` key in `.claude/settings.json` (Claude Code does not read a standalone hooks.json), `.cursor/hooks.json`, and `.codex/hooks.json`.
+- Review `.codex/config.toml`, `.codex/hooks.json`, `.cursor/hooks.json`, and `.claude/settings.json` before changing agent orchestration or hook behavior, because they are the entry points contributors will actually load.
 
 ### Security and Boundaries
 
@@ -146,10 +155,18 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 ## Local Development
 
 ```bash
-/usr/bin/python3 -m http.server 4173 --directory .   # http://localhost:4173
+corepack enable
+corepack yarn install
+corepack yarn start   # http://localhost:4173
 ```
 
-No install step. Edit `index.html` / `styles.css` and reload.
+Edit React code in `src/` and shared styles in `styles.css`.
+
+AI workflow parity check:
+
+```bash
+node scripts/validate-ai-workflow.mjs
+```
 
 ## Playbooks (Load On Demand)
 
@@ -157,7 +174,7 @@ Use these only when relevant to the active task:
 
 - Hooks setup and scripts: `docs/agent-playbooks/hooks-setup.md`
 - Commit and issue output format: `docs/agent-playbooks/commit-issue-format.md`
-- Skills and tools setup: `docs/agent-playbooks/skills-and-tools.md`
+- Skills/tools setup, MCP rationale, and committed skills/subagents index: `docs/agent-playbooks/skills-and-tools.md`
 - Bug investigation workflow: `docs/agent-playbooks/bug-investigation.md`
 - Deployment (Vercel + Cloudflare): `docs/agent-playbooks/deployment.md`
 - Known surprises log: `docs/agent-playbooks/known-surprises.md`
