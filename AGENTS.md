@@ -38,7 +38,7 @@ protocol** — copy on the site must never blur that line.
 - Company name is **Bitsocial Forge Inc.** ("Bitsocial Forge" or "Forge" in running text). Never "BitSocial", "Bitsocial Labs", or "Plebbit Labs" (old name).
 - Canonical handles: GitHub `github.com/bitsocialforge`, X `@bitsocialforge`. Product dashboard domain: `rpc.bitsocialforge.com`.
 - Forge RPC is **in development** — do not present it as live, and do not hyperlink `rpc.bitsocialforge.com` until it launches.
-- The visual identity is fixed: black background, forge-orange (`--ember: #FF6A00`) monospace type, hollow-circle hexagon network logo (outlines only, never solid fills, never the old black-on-white mark). All colors come from CSS variables in `styles.css`.
+- The visual identity is fixed: black background, forge-orange (`--ember: #FF6A00`) monospace type, and the seven-node lattice network logo (solid ember nodes joined by 30° connectors, no hexagon or other container shape, never the old black-on-white mark). The mark is always ember orange on black. All colors come from CSS variables in `styles.css`.
 - Master-plan claims (phases, quotes) must match `bitsocial-web/about` content; do not invent roadmap items.
 
 ## Instruction Priority

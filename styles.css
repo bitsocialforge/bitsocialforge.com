@@ -131,6 +131,7 @@ header {
   width: 46px;
   height: 46px;
   stroke: var(--ember);
+  color: var(--ember);
   flex-shrink: 0;
   filter: drop-shadow(0 0 6px rgba(255, 106, 0, 0.35));
   transition: filter 0.25s ease;
@@ -496,7 +497,7 @@ section > .wrap > p, .sec-intro {
   gap: 28px;
 }
 .foot-brand { display: flex; align-items: center; gap: 12px; color: var(--text-dim); font-size: 12.5px; }
-.foot-brand svg { width: 30px; height: 30px; stroke: var(--ember); opacity: 0.85; }
+.foot-brand svg { width: 30px; height: 30px; stroke: var(--ember); color: var(--ember); opacity: 0.85; }
 .foot-links {
   display: grid;
   grid-template-columns: repeat(3, auto);
