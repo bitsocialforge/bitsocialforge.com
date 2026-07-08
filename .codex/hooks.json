@@ -1,18 +1,24 @@
 {
-  "version": 1,
   "hooks": {
-    "stop": [
+    "Stop": [
       {
-        "command": ".codex/hooks/sync-git-branches.sh",
-        "timeout": 60
-      },
-      {
-        "command": ".codex/hooks/code-quality-review-reminder.sh",
-        "timeout": 10
-      },
-      {
-        "command": ".codex/hooks/verify.sh",
-        "timeout": 120
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/sync-git-branches.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/code-quality-review-reminder.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/verify.sh\"",
+            "timeout": 120
+          }
+        ]
       }
     ]
   }

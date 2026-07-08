@@ -28,12 +28,12 @@ If uncertain, ask the developer before adding an entry.
 
 ## Entries
 
-### Preview/dev servers must use /usr/bin/python3, not a pyenv shim
+### Static preview server advice is superseded by Vite
 
 - **Date:** 2026-07-05
 - **Observed by:** Tommaso + Claude
-- **Context:** Serving the site locally for browser verification (`python3 -m http.server`).
-- **What was surprising:** A bare `python3` can resolve to a pyenv shim, and pyenv shims can fail in sandboxed shells with `getcwd: cannot access parent directories`, so the server never starts even though the command looks correct.
-- **Impact:** Browser verification silently fails or blocks, and agents waste time debugging the site instead of the interpreter.
-- **Mitigation:** Always start the local static server with the system interpreter: `/usr/bin/python3 -m http.server 4173 --directory .`.
-- **Status:** confirmed
+- **Context:** Before the React/Vite migration, browser verification used `python3 -m http.server`.
+- **What was surprising:** A bare `python3` could resolve to a pyenv shim and fail in sandboxed shells with `getcwd: cannot access parent directories`, so the server never started even though the command looked correct.
+- **Impact:** This is no longer the normal dev-server path after the Vite migration, but old instructions may still mention the static server.
+- **Mitigation:** Use `corepack yarn start` for local browser verification. If a one-off Python static server is ever needed for historical artifacts, use `/usr/bin/python3`, not a pyenv shim.
+- **Status:** superseded

@@ -42,7 +42,7 @@ After implementing all assigned tasks:
 scripts/agent-hooks/verify.sh < /dev/null
 ```
 
-This confirms local asset references resolve and the HTML structure is intact. Run any targeted browser verification the parent agent requested: serve the site with `/usr/bin/python3 -m http.server 4173 --directory .` and check `http://localhost:4173` with `playwright-cli`.
+This confirms dependencies install immutably, TypeScript passes, lint passes, Vite builds, local asset references resolve, and the HTML shell structure is intact. Run any targeted browser verification the parent agent requested: serve the site with `corepack yarn start` and check `http://localhost:4173` with `playwright-cli`.
 
 ### Step 4: Report Back
 
@@ -56,7 +56,7 @@ This confirms local asset references resolve and the HTML structure is intact. R
 - [ ] Task description — reason for failure
 
 ### Verification
-- Asset/HTML checks: PASS/FAIL
+- Vite/TypeScript/asset checks: PASS/FAIL
 
 ### Status: SUCCESS / PARTIAL / FAILED
 ```
@@ -67,4 +67,4 @@ This confirms local asset references resolve and the HTML structure is intact. R
 - Follow project patterns from `AGENTS.md`.
 - Do not revert unrelated changes in the working tree.
 - If a task conflicts with existing code, report the conflict instead of guessing.
-- Keep the site dependency-free: no `package.json`, no build tooling, no external CDNs.
+- Keep the site static and TypeScript-first: no backend runtime, no new trackers, no external CDNs, and no new plain JavaScript app files unless a platform boundary requires it.

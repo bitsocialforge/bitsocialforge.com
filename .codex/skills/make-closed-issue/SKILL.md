@@ -1,11 +1,11 @@
 ---
 name: make-closed-issue
-description: Create a GitHub issue from recent changes, commit only relevant diffs, and close the issue with the commit hash. Use when the user says "make closed issue", "close issue", or wants to create a tracked, already-resolved GitHub issue for completed work.
+description: Create a GitHub issue from recent changes, commit only relevant diffs on a short-lived task branch, push that branch, and open a PR into master that will close the issue on merge. Use when the user says "make closed issue", "close issue", or wants to create a tracked, already-resolved GitHub issue for completed work.
 ---
 
 # Make Closed Issue
 
-Creates a GitHub issue, commits relevant changes, and closes the issue with the commit hash — all in one workflow.
+Creates a GitHub issue, commits relevant changes on a review branch, pushes the branch, and opens a PR into `master` that closes the issue when merged.
 
 ## Inputs
 
@@ -14,18 +14,55 @@ Creates a GitHub issue, commits relevant changes, and closes the issue with the 
 
 ## Workflow
 
-### 1. Determine label(s)
+### 1. Determine labels
 
-Ask the user using AskQuestion (multi-select):
+Choose issue labels from the conversation context and diff. Do not ask the user to pick labels unless the work is genuinely ambiguous after reviewing both.
 
-| Option                | When                                 |
-| --------------------- | ------------------------------------ |
-| `bug`                 | Bug fix                              |
-| `enhancement`         | New feature                          |
-| `bug` + `enhancement` | New feature that also fixes a bug    |
-| `documentation`       | README, AGENTS.md, docs-only changes |
+Default mapping:
 
-### 2. Review diffs for relevance
+| Option | When |
+| ------ | ---- |
+| `bug` | Bug fix |
+| `enhancement` | New feature |
+| `bug` + `enhancement` | New feature that also fixes a bug |
+| `documentation` | README, AGENTS.md, docs-only changes |
+
+When classification is ambiguous, make the best reasonable choice and note the reasoning in the final summary. Only ask the user if the ambiguity would materially affect tracking or triage.
+
+### 2. Resolve the current GitHub assignee
+
+Before creating or editing any issue assignee, determine the current contributor's GitHub username from the authenticated `gh` session.
+If `gh` is not signed in or cannot resolve the login, stop and ask the contributor for their GitHub username before proceeding.
+
+```bash
+GH_LOGIN=$(gh api user --jq '.login' 2>/dev/null || true)
+
+if [ -z "$GH_LOGIN" ]; then
+  echo "GitHub username could not be determined from gh auth. Ask the contributor for their GitHub username before proceeding."
+  exit 1
+fi
+```
+
+### 3. Ensure branch workflow is reviewable
+
+- If already on a short-lived task branch such as `codex/feature/*`, `codex/fix/*`, `codex/docs/*`, or `codex/chore/*`, stay on it.
+- If on `master`, create a task branch before staging or committing.
+- Do not commit the work directly on `master` when PR review bots are expected.
+
+Suggested naming:
+
+- `codex/feature/short-slug`
+- `codex/fix/short-slug`
+- `codex/docs/short-slug`
+- `codex/chore/short-slug`
+
+Example:
+
+```bash
+git switch -c codex/docs/update-agent-playbooks
+```
+
+### 4. Review diffs for relevance
 
 ```bash
 git status
@@ -37,14 +74,14 @@ Identify which files relate to the work done in this conversation. Only relevant
 
 **Important**: `git add -p` and `git add -i` are not available (interactive mode unsupported). If a file has mixed relevant/irrelevant changes, include the entire file and note the caveat to the user.
 
-### 3. Generate issue title and description
+### 5. Generate issue title and description
 
 From the conversation context:
 
-- **Title**: Short, present-tense, describes the **problem** (not the solution). Use backticks for UI elements, code, or literal strings (e.g. Hero `` `Follow @bitsocialforge` `` button overflows on mobile).
-- **Description**: 2-3 sentences about the problem. Use backticks for UI element names (`Forge RPC`, `Master Plan`), code references (`.heat-rule`, `--ember`), and literal text strings. Write as if the issue hasn't been fixed yet.
+- **Title**: Short, present-tense, describes the problem (not the solution). Use backticks for UI elements, code, or literal strings (for example, Hero `` `Follow @bitsocialforge` `` button overflows on mobile).
+- **Description**: 2-3 sentences about the problem. Use backticks for UI element names (`Forge RPC`, `Master Plan`), code references (`.heat-rule`, `--ember`), and literal text strings. Write as if the issue has not been fixed yet.
 
-### 4. Create the issue
+### 6. Create the issue
 
 ```bash
 gh issue create \
@@ -52,17 +89,17 @@ gh issue create \
   --title "ISSUE_TITLE" \
   --body "ISSUE_DESCRIPTION" \
   --label "LABEL1,LABEL2" \
-  --assignee "@me"
+  --assignee "$GH_LOGIN"
 ```
 
 Capture the issue number from the output.
 
-### 5. Commit relevant changes
+### 7. Commit relevant changes
 
 Stage only the relevant files:
 
 ```bash
-git add index.html styles.css ...
+git add index.html styles.css docs/agent-playbooks/example.md
 ```
 
 Commit using Conventional Commits with scope:
@@ -71,32 +108,56 @@ Commit using Conventional Commits with scope:
 git commit -m "$(cat <<'EOF'
 type(scope): concise title
 
-Optional 1-sentence description only if the title isn't self-explanatory.
+Optional 1-sentence description only if the title is not self-explanatory.
 EOF
 )"
 ```
 
 - **Types**: `fix`, `feat`, `perf`, `refactor`, `docs`, `chore`
-- **Scope**: area of the site (e.g., `hero`, `master-plan`, `styles`, `deploy`)
-- Prefer title-only commits — skip description when the title is exhaustive
+- **Scope**: area of the site or workflow (for example, `hero`, `master plan`, `agent hooks`, `deploy`)
+- Prefer title-only commits; skip the description when the title is exhaustive.
 
-### 6. Comment with commit hash and close
+### 8. Push branch and open PR
 
-Use the **full** (40-character) commit hash, not the short form.
+Push the current task branch to origin and open a PR into `master`.
+
+Use `Closes #ISSUE_NUMBER` in the PR body so the issue closes automatically when the PR is merged.
 
 ```bash
 COMMIT_HASH=$(git rev-parse HEAD)
-gh issue comment ISSUE_NUMBER --repo bitsocialforge/bitsocialforge.com --body "$COMMIT_HASH"
-gh issue close ISSUE_NUMBER --repo bitsocialforge/bitsocialforge.com
+BRANCH_NAME=$(git branch --show-current)
+git push -u origin "$BRANCH_NAME"
+
+gh pr create \
+  --repo bitsocialforge/bitsocialforge.com \
+  --base master \
+  --head "$BRANCH_NAME" \
+  --title "PR_TITLE" \
+  --body "$(cat <<EOF
+SUMMARY
+
+Closes #ISSUE_NUMBER
+EOF
+)"
 ```
 
-### 7. Report summary
+Do not merge the PR locally as part of this skill. Review bots must be allowed to inspect the PR first.
+
+If the user later explicitly asks to merge after reviews pass, run `review-and-merge-pr`.
+
+### 9. Report summary
 
 Print a summary to the user:
 
-```
-Issue #NUMBER created, committed, and closed.
+```text
+Issue #NUMBER created, committed, pushed, and linked to a PR into master.
+  Branch: BRANCH_NAME
   Commit: HASH
   Labels: label1, label2
+  PR: PR_URL
   URL: https://github.com/bitsocialforge/bitsocialforge.com/issues/NUMBER
 ```
+
+If the PR has not been merged yet, explicitly tell the user that the issue will close on PR merge and that the branch should not be deleted yet.
+
+After the PR is open, use `review-and-merge-pr` to inspect bot, CI, and human feedback before merging.

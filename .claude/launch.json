@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bitsocialforge",
+      "runtimeExecutable": "corepack",
+      "runtimeArgs": ["yarn", "start"],
+      "port": 4173
+    }
+  ]
+}

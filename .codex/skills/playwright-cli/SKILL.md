@@ -16,7 +16,7 @@ When using `playwright-cli` to verify rendering, styling, layout, or interaction
 
 Use separate named sessions per engine, compare the results, and record any engine-specific differences instead of treating Chromium output as sufficient.
 
-The default local dev URL for this repo is `http://localhost:4173`. If the static server is not running, start it first with `/usr/bin/python3 -m http.server 4173 --directory .` from the repo root.
+The default local dev URL for this repo is `http://localhost:4173`. If the Vite dev server is not running, start it first with `corepack yarn start` from the repo root.
 
 ```bash
 playwright-cli -s=verify-chrome open http://localhost:4173 --browser=chrome
@@ -40,6 +40,34 @@ playwright-cli screenshot
 # close the browser
 playwright-cli close
 ```
+
+## Session mode selection
+
+Default to a fresh isolated browser session for reproducible verification.
+
+Before browser work where existing state may matter, explicitly confirm the mode if the user has not already said which one they want:
+
+1. Fresh isolated `playwright-cli` session
+2. Current browser session reuse
+
+Existing state usually matters when the task depends on auth, cookies, extensions, open tabs, or reproducing something already happening in the contributor's browser.
+
+Do not attach to a live personal browser session without explicit approval.
+
+If current-session reuse is requested, prefer the supported attach path in the local setup:
+
+```bash
+# Fresh isolated browser (default)
+playwright-cli -s=verify open http://localhost:4173
+
+# Reusable Playwright-managed profile
+playwright-cli -s=verify open http://localhost:4173 --persistent
+
+# Attach to an existing browser when the local extension bridge is set up
+playwright-cli open --extension
+```
+
+If the task requires the contributor's current browser session and the attach path is not available in the current setup, stop and ask whether to switch to a fresh session or provide an explicit CDP-based Playwright script.
 
 ## Commands
 

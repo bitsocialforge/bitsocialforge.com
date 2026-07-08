@@ -28,7 +28,7 @@ Scan the diff against master and remove AI-generated slop introduced in this bra
    ```bash
    scripts/agent-hooks/verify.sh < /dev/null
    ```
-   For visual changes, also serve the site (`/usr/bin/python3 -m http.server 4173 --directory .`) and check the browser console for errors plus desktop and 375px mobile layouts.
+   For visual changes, also serve the site (`corepack yarn start`) and check the browser console for errors plus desktop and 375px mobile layouts.
 5. **Report** a 1-3 sentence summary of what you changed
 
 ## Slop Categories
@@ -54,7 +54,7 @@ h1 { font-size: clamp(2.1rem, 8vw, 4.6rem); }
 
 ### Excessive defensive checks
 
-This site is plain HTML + CSS with almost no JavaScript. If a diff introduces script, remove guards the surrounding code doesn't need — for example wrapping a `querySelector` of an element that always exists in existence checks and try/catch.
+This site is a small static React + TypeScript app. If a diff introduces component complexity, remove guards and state the surrounding code does not need — for example memoization, effects, or defensive wrappers around markup that is always rendered.
 
 ### Hardcoded values
 

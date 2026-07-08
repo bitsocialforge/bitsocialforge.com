@@ -1,5 +1,8 @@
 {
   "cleanUrls": true,
+  "installCommand": "corepack enable && corepack yarn install --immutable",
+  "buildCommand": "corepack yarn build",
+  "outputDirectory": "dist",
   "trailingSlash": false,
   "redirects": [
     {
@@ -10,12 +13,6 @@
     }
   ],
   "headers": [
-    {
-      "source": "/fonts/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
     {
       "source": "/assets/(.*)",
       "headers": [
