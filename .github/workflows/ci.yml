@@ -1,23 +1,19 @@
-name: Deploy to Vercel
+name: CI
 
 on:
   push:
     branches: [master]
 
 concurrency:
-  group: production-deploy
+  group: master-ci
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  checks:
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.12.0
       - name: Enable Corepack
@@ -30,5 +26,3 @@ jobs:
         run: corepack yarn lint
       - name: Build
         run: corepack yarn build
-      - name: Deploy
-        run: npx vercel@latest deploy --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
