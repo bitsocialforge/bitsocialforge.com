@@ -1,6 +1,6 @@
 {
   "cleanUrls": true,
-  "installCommand": "corepack enable && yarn install --immutable",
+  "installCommand": "corepack enable && corepack yarn install --immutable",
   "buildCommand": "corepack yarn build",
   "outputDirectory": "dist",
   "trailingSlash": false,
