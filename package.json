@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "yarn@4.17.1",
   "scripts": {
-    "start": "vite --host 127.0.0.1 --port 4173",
+    "start": "node scripts/start-dev.mjs",
     "dev": "corepack yarn start",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
@@ -26,5 +26,8 @@
     "oxlint": "1.72.0",
     "typescript": "7.0.2",
     "vite": "8.1.3"
+  },
+  "optionalDependencies": {
+    "portless": "0.11.1"
   }
 }
