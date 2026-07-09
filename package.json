@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "yarn@4.13.0",
+  "packageManager": "yarn@4.17.1",
   "scripts": {
     "start": "vite --host 127.0.0.1 --port 4173",
     "dev": "corepack yarn start",
@@ -24,7 +24,7 @@
     "@vitejs/plugin-react": "6.0.3",
     "oxfmt": "0.57.0",
     "oxlint": "1.72.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "8.1.3"
   }
 }
