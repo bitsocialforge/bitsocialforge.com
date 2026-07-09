@@ -149,8 +149,10 @@ a:focus-visible, button:focus-visible {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  /* Swapped instantly (no transition): interpolating from 9999px stays above the
+     corner clamp for almost the whole duration, so the open animation would clip
+     the menu as a huge lozenge and snap at the end. */
   border-radius: 9999px;
-  transition: border-radius 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .topbar-frosted.is-expanded {
@@ -439,7 +441,6 @@ a:focus-visible, button:focus-visible {
     animation: none;
   }
 
-  .topbar-frosted,
   .topbar-hamburger-lines span,
   .mobile-menu {
     transition: none;
