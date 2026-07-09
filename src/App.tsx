@@ -1,5 +1,7 @@
 import { Analytics } from "@vercel/analytics/react";
 import type { CSSProperties, ReactNode } from "react";
+import { ForgeMark } from "./components/forge-mark";
+import { Topbar, TopbarSpacer } from "./components/topbar";
 
 type CustomProperties = CSSProperties & Record<`--${string}`, string>;
 
@@ -88,28 +90,6 @@ function delayStyle(delay: string): CSSProperties {
   };
 }
 
-function ForgeMark() {
-  return (
-    <svg viewBox="0 0 512 512" fill="none" strokeWidth="22" aria-hidden="true">
-      <line x1="219.63" y1="103.79" x2="142.37" y2="148.4" />
-      <line x1="292.37" y1="103.79" x2="369.63" y2="148.4" />
-      <line x1="142.37" y1="190.4" x2="219.63" y2="235" />
-      <line x1="369.63" y1="190.4" x2="292.37" y2="235" />
-      <line x1="219.63" y1="277" x2="142.37" y2="321.6" />
-      <line x1="292.37" y1="277" x2="369.63" y2="321.6" />
-      <line x1="142.37" y1="363.6" x2="219.63" y2="408.21" />
-      <line x1="369.63" y1="363.6" x2="292.37" y2="408.21" />
-      <circle cx="256" cy="82.79" r="44" fill="currentColor" stroke="none" />
-      <circle cx="106" cy="169.4" r="44" fill="currentColor" stroke="none" />
-      <circle cx="406" cy="169.4" r="44" fill="currentColor" stroke="none" />
-      <circle cx="256" cy="256" r="44" fill="currentColor" stroke="none" />
-      <circle cx="106" cy="342.6" r="44" fill="currentColor" stroke="none" />
-      <circle cx="406" cy="342.6" r="44" fill="currentColor" stroke="none" />
-      <circle cx="256" cy="429.21" r="44" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
 function Atmosphere() {
   return (
     <>
@@ -121,29 +101,6 @@ function Atmosphere() {
         ))}
       </div>
     </>
-  );
-}
-
-function Header() {
-  return (
-    <header>
-      <a className="brand" href="/" aria-label="Bitsocial Forge home">
-        <ForgeMark />
-        <b>
-          BITSOCIAL <em>FORGE</em>
-        </b>
-      </a>
-      <nav aria-label="Main">
-        <a href="#forge-rpc">Forge RPC</a>
-        <a href="#master-plan">Master Plan</a>
-        <a href="https://bitsocial.net" rel="noopener">
-          Bitsocial
-        </a>
-        <a href="https://x.com/bitsocialforge" rel="noopener">
-          X
-        </a>
-      </nav>
-    </header>
   );
 }
 
@@ -292,7 +249,7 @@ function MasterPlan() {
       <ol className="phases">
         <li className="ongoing">
           <span className="phase-tag">
-            PHASE_01 <span className="badge live">Ongoing</span>
+            Phase 01 <span className="badge live">Ongoing</span>
           </span>
           <h3>Decentralize imageboards &amp; forums</h3>
           <p>
@@ -308,7 +265,7 @@ function MasterPlan() {
           </p>
         </li>
         <li>
-          <span className="phase-tag">PHASE_02</span>
+          <span className="phase-tag">Phase 02</span>
           <h3>Launch Bitsocial Chain</h3>
           <p>
             The proposed Ethereum L2 appchain economic layer: decentralized <code>.bso</code>{" "}
@@ -317,7 +274,7 @@ function MasterPlan() {
           </p>
         </li>
         <li>
-          <span className="phase-tag">PHASE_03</span>
+          <span className="phase-tag">Phase 03</span>
           <h3>Launch the flagship Bitsocial app</h3>
           <p>
             The first profile-based client: posts, follows, real-time public conversation. As
@@ -326,7 +283,7 @@ function MasterPlan() {
           </p>
         </li>
         <li>
-          <span className="phase-tag">PHASE_04</span>
+          <span className="phase-tag">Phase 04</span>
           <h3>Scale Bitsocial economies</h3>
           <p>
             Infrastructure pluralism: many competing RPCs, hosting, discovery, and moderation
@@ -334,7 +291,7 @@ function MasterPlan() {
           </p>
         </li>
         <li>
-          <span className="phase-tag">PHASE_05</span>
+          <span className="phase-tag">Phase 05</span>
           <h3>Decentralize all social media</h3>
           <p>
             Fund and build the long tail of social clients: blogging, crowdfunding, creator video,
@@ -396,8 +353,9 @@ export function App() {
   return (
     <>
       <Atmosphere />
+      <Topbar />
+      <TopbarSpacer />
       <div className="wrap">
-        <Header />
         <main>
           <Hero />
           <ForgeRpc />
