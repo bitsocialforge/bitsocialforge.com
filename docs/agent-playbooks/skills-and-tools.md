@@ -76,4 +76,4 @@ Avoid GitHub MCP and browser MCP servers for this project because they add signi
 ## Model Availability
 
 - `composer-2` family models are available only in Cursor. Do not configure them under `.claude/` or `.codex/`.
-- For `.codex/agents/**`, use `gpt-5.4` by default. Do not use `gpt-5.3-codex` or `gpt-5.3-codex-spark`.
+- Codex does not document a `latest` model alias. Committed custom-agent TOMLs under `.codex/**/agents/*.toml` omit both `model` and `model_reasoning_effort` so they inherit the current parent session settings.

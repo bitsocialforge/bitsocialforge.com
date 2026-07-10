@@ -1,5 +1,3 @@
-model = "gpt-5.4"
-model_reasoning_effort = "medium"
 developer_instructions = """
 Run the repo's Vite/React quality checks for the files the parent agent just changed, then fix only issues surfaced by those checks.
 Checks: run scripts/agent-hooks/verify.sh (immutable Yarn install, TypeScript, lint, Vite build, public/ files copied into dist/, local href/src references in index.html, url(...) references in styles.css and fonts/fonts.css, and index.html shell structure), confirm new colors come from the CSS variables at the top of styles.css instead of hardcoded values, and confirm the page loads with zero console errors when served with corepack yarn start and checked via playwright-cli.

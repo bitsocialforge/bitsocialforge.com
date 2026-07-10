@@ -134,7 +134,7 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 - Do not add or use a repo-level `.agents/` directory. Keep skills in `.codex/skills/`, `.cursor/skills/`, and `.claude/skills/` only.
 - Keep equivalent workflow files aligned across all toolchains when their directories contain the same skill, hook, or agent.
 - Keep shared behavior equivalent while preserving harness-specific models, config formats, hook entry points, and tool invocation syntax.
-- Keep model names toolchain-specific: `composer-2` is Cursor-only and must not appear under `.claude/` or `.codex/`; `.codex/agents/**` should use `gpt-5.4` by default. Do not use `gpt-5.3-codex` or `gpt-5.3-codex-spark` in `.codex/`.
+- Codex does not document a `latest` model alias. Every committed custom-agent TOML under `.codex/**/agents/*.toml` must omit both `model` and `model_reasoning_effort` so the agent inherits the current parent session settings; keep explicit model controls in other toolchains and tool APIs harness-specific.
 - Hook entry points are harness-specific: the `hooks` key in `.claude/settings.json` (Claude Code does not read a standalone hooks.json), `.cursor/hooks.json`, and `.codex/hooks.json`.
 - Review `.codex/config.toml`, `.codex/hooks.json`, `.cursor/hooks.json`, and `.claude/settings.json` before changing agent orchestration or hook behavior, because they are the entry points contributors will actually load.
 
