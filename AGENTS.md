@@ -84,7 +84,7 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 | Repo AI workflow files changed (`.codex/**`, `.cursor/**`, `.claude/**`, `AGENTS.md`, `docs/agent-playbooks/**`, `scripts/agent-hooks/**`) | Keep the Codex, Cursor, and Claude copies aligned when they represent the same workflow; run `node scripts/validate-ai-workflow.mjs`; update `AGENTS.md` if the default agent policy changes |
 | GitHub operation needed | Use `gh` CLI, not GitHub MCP |
 | User asks for commit or issue phrasing | Use `docs/agent-playbooks/commit-issue-format.md` |
-| Bug report in a specific file/line | Start with a git history scan (`git log --oneline`, `git blame`, scoped `git show`) before editing |
+| Bug report | Reproduce the reported behavior or establish the defect from conclusive source/runtime evidence before editing; for a specific file/line, also start with a git history scan (`git log --oneline`, `git blame`, scoped `git show`) |
 | Surprising or ambiguous repo behavior encountered | Alert the developer and, once confirmed, document it in `docs/agent-playbooks/known-surprises.md` |
 
 ## Stack
@@ -114,6 +114,12 @@ Agents may use compiled context to navigate quickly, but must verify against sou
 - Name short-lived AI task branches by intent under the Codex prefix: `codex/feature/*`, `codex/fix/*`, `codex/docs/*`, `codex/chore/*`.
 - Open PRs from task branches into `master`. Never open PRs as draft unless the user explicitly asks.
 - Use worktrees only when parallel tasks need isolated checkouts, with descriptive worktree names. One active task branch per worktree.
+
+### Bug Investigation Rules
+
+- A bug fix requires either a reproduction of the reported behavior or conclusive source/runtime evidence that identifies both the defect and the correct fix with equivalent certainty.
+- If the bug cannot be reproduced and the evidence is not conclusive, do not guess or make speculative changes. Report what was checked, say that the bug was not reproduced, and ask for the missing reproduction details when useful.
+- When proceeding from conclusive evidence without a reproduction, explain why the evidence is sufficient and add a targeted regression test when practical.
 
 ### Verification Rules
 
