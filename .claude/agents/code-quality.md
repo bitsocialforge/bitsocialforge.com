@@ -1,6 +1,5 @@
 ---
 name: code-quality
-model: sonnet
 description: Code quality specialist that checks Vite/TypeScript build health, local asset resolution, CSS variable usage, and console errors, then fixes any errors it finds. Use proactively after code changes to verify nothing is broken.
 ---
 
