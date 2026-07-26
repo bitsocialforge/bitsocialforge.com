@@ -29,5 +29,9 @@
   },
   "optionalDependencies": {
     "portless": "0.11.1"
+  },
+  "resolutions": {
+    "postcss": "8.5.23",
+    "tar": "7.5.22"
   }
 }
