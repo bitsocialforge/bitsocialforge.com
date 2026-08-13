@@ -2,6 +2,12 @@
   "name": "bitsocialforge.com",
   "version": "0.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://bitsocialforge.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bitsocialforge/bitsocialforge.com.git"
+  },
   "type": "module",
   "packageManager": "yarn@4.17.1",
   "scripts": {
