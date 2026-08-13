@@ -6,12 +6,14 @@ accelerating peer-to-peer social media on the open
 [Forge RPC](https://github.com/bitsocialforge), the first public non-custodial
 Bitsocial RPC service.
 
+This repository is public so the site, its operating conventions, and its
+deployment-facing configuration can be inspected, improved, and reused.
+
 ## Stack
 
 Static React + TypeScript site built with Vite, using Yarn 4 and Node 22.12.0
-to stay aligned with 5chan and adjacent Bitsocial projects. Fonts are
-self-hosted (Martian Mono, Spline Sans Mono), with global styling in
-`styles.css`.
+to stay aligned with 5chan and adjacent Bitsocial projects. The Exo and Spline
+Sans Mono fonts are self-hosted, with global styling in `styles.css`.
 
 ```bash
 corepack enable
@@ -39,4 +41,11 @@ Agent policy lives in [AGENTS.md](AGENTS.md), with repo-managed skills, hooks,
 and playbooks under `.claude/`, `.cursor/`, `.codex/`, and
 `docs/agent-playbooks/` (mirrored per toolchain).
 
-© Bitsocial Forge Inc. All rights reserved.
+## License
+
+Bitsocial Forge-authored source code and documentation are available under the
+[GNU General Public License v3.0 or later](LICENSE). Bundled skills and fonts
+retain their upstream terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The license does not grant rights to the Bitsocial Forge trademarks. See
+[TRADEMARKS.md](TRADEMARKS.md).
