@@ -300,54 +300,75 @@ function ForgeImages() {
   );
 }
 
-function MasterPlan() {
+function ForgeRole() {
   return (
-    <section id="master-plan" aria-label="Master plan">
+    <section id="forge-role" aria-label="Forge's role">
       <hr className="heat-rule" />
       <div className="sec-head">
         <span className="sec-num">03</span>
-        <h2>Master Plan</h2>
+        <h2>Forge&apos;s Role</h2>
       </div>
       <p className="sec-intro">
-        Bitsocial Forge executes the{" "}
+        <strong>A company inside a protocol it does not own.</strong> Bitsocial Forge executes{" "}
         <a href="https://bitsocial.net" rel="noopener">
-          Bitsocial master plan
-        </a>
-        : replace platform ownership with protocol competition, one phase at a time.
+          the Bitsocial master plan
+        </a>{" "}
+        from Phase 01: build the infrastructure the network needs before a market for it exists,
+        then work to make that market exist.
       </p>
 
-      <ol className="phases">
-        <li className="ongoing">
-          <span className="phase-tag">
-            Phase 01 <span className="badge live">Ongoing</span>
-          </span>
-          <h3>Decentralize imageboards &amp; forums</h3>
-          <p>
-            <a href="https://5chan.app" rel="noopener">
-              5chan
-            </a>{" "}
-            and{" "}
-            <a href="https://seedit.app" rel="noopener">
-              Seedit
-            </a>{" "}
-            prove Bitsocial can replace centralized boards without global admins. Forge RPC makes
-            always-on p2p communities practical from anywhere.
-          </p>
-        </li>
-        <li>
-          <span className="phase-tag">Phases 02–05</span>
-          <h3>Chain, flagship app, and the long tail</h3>
-          <p>
-            The roadmap continues with the Bitsocial Chain economic layer, a flagship
-            profile-based client, competing infrastructure providers, and the long tail of social
-            clients. Forge&apos;s RPC should not be the only successful RPC. That is the point.{" "}
-            <a href="https://bitsocial.net" rel="noopener">
-              Read the full master plan
-            </a>
-            .
-          </p>
-        </li>
-      </ol>
+      <div className="spec">
+        <div className="spec-row">
+          <span className="k">first</span>
+          <div>
+            <h3>First services, not the only ones</h3>
+            <p>
+              Forge RPC and Forge Images exist because a peer-to-peer network still needs someone to
+              run the unglamorous parts on day one. Being first is a starting position, not a claim
+              on the category.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">interop</span>
+          <div>
+            <h3>Tooling for our own competition</h3>
+            <p>
+              The wire-protocol client package and the reference operator dashboard are built to be
+              published, so rival RPCs stay wire-compatible and can run the same tooling against
+              their own servers. No Forge code required to compete with Forge.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">fund</span>
+          <div>
+            <h3>Revenue routed back out</h3>
+            <p>
+              The plan for a profitable Forge is to fund the ecosystem it competes in: independent
+              clients, competing RPCs, media hosts, moderation and indexing tools, through
+              investment, grants, and community-decided funding. Intent, not a live program.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">separate</span>
+          <div>
+            <h3>Protocol and company kept apart</h3>
+            <p>
+              The protocol, 5chan, Seedit, and the shared libraries live under{" "}
+              <a href="https://github.com/bitsocialnet" rel="noopener">
+                bitsocialnet
+              </a>
+              . Forge&apos;s products live under{" "}
+              <a href="https://github.com/bitsocialforge" rel="noopener">
+                bitsocialforge
+              </a>
+              . Different orgs, different owners, on purpose.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <blockquote className="quote">
         <p>
@@ -403,7 +424,7 @@ export function App() {
           <Hero />
           <ForgeRpc />
           <ForgeImages />
-          <MasterPlan />
+          <ForgeRole />
         </main>
       </div>
       <SiteFooter />

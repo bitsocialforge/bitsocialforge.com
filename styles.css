@@ -612,7 +612,6 @@ h2 {
   vertical-align: middle;
   white-space: nowrap;
 }
-.badge.live { border-color: var(--ember); background: rgba(255, 106, 0, 0.1); }
 
 section > .wrap > p, .sec-intro {
   max-width: 68ch;
@@ -665,64 +664,6 @@ section > .wrap > p, .sec-intro {
   font-family: var(--mono-text);
   font-size: 12.5px;
 }
-
-/* ---- phases -------------------------------------------------------- */
-
-.phases {
-  list-style: none;
-  margin-top: 52px;
-  position: relative;
-}
-.phases::before {
-  content: "";
-  position: absolute;
-  left: 10px;
-  top: 14px;
-  bottom: 14px;
-  width: 1px;
-  background: linear-gradient(180deg, var(--ember), var(--line-dim) 30%, var(--line-dim));
-}
-.phases li {
-  position: relative;
-  padding: 0 0 46px 52px;
-}
-.phases li:last-child { padding-bottom: 8px; }
-.phases li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 5px;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  border: 2px solid var(--ember);
-  background: var(--bg);
-}
-.phases li.ongoing::before {
-  background: var(--ember);
-  box-shadow: 0 0 14px rgba(255, 106, 0, 0.8);
-}
-.phase-tag {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.phases h3 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.25rem;
-  letter-spacing: 0;
-  color: var(--white-hot);
-  margin: 8px 0 10px;
-}
-.phases p { max-width: 66ch; font-size: 13.5px; }
-.phases p a { border-bottom: 1px solid var(--line); }
 
 /* ---- quote --------------------------------------------------------- */
 

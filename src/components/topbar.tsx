@@ -14,7 +14,7 @@ type TopbarLink = {
 const TOPBAR_LINKS: TopbarLink[] = [
   { label: "RPC", href: "#forge-rpc" },
   { label: "Images", href: "#forge-images" },
-  { label: "Master Plan", href: "#master-plan" },
+  { label: "Role", href: "#forge-role" },
   { label: "Bitsocial", href: "https://bitsocial.net", external: true },
   { label: "X", href: "https://x.com/bitsocialforge", external: true },
 ];
