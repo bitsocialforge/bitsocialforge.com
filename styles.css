@@ -109,7 +109,7 @@ a:focus-visible, button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .embers span, .cursor, .term-line, .term-caret { animation: none !important; }
+  .embers span, .term-line, .term-caret { animation: none !important; }
   .term-line { opacity: 1 !important; }
   html { scroll-behavior: auto; }
 }
@@ -472,16 +472,6 @@ h1 {
 }
 h1 .hot { color: var(--ember); }
 
-.cursor {
-  display: inline-block;
-  width: 0.5em;
-  height: 0.85em;
-  margin-left: 0.12em;
-  vertical-align: baseline;
-  transform: translateY(0.12em);
-  background: var(--ember);
-  animation: blink 1.1s steps(1) infinite;
-}
 @keyframes blink { 50% { opacity: 0; } }
 
 .hero p.lede {

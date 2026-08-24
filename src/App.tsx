@@ -134,7 +134,6 @@ function Hero() {
         peer-to-peer
         <br />
         <span className="hot">social media</span>
-        <span className="cursor" aria-hidden="true" />
       </h1>
       <p className="lede">
         Bitsocial Forge builds infrastructure for <strong>Bitsocial</strong>: the open-source
@@ -336,37 +335,16 @@ function MasterPlan() {
           </p>
         </li>
         <li>
-          <span className="phase-tag">Phase 02</span>
-          <h3>Launch Bitsocial Chain</h3>
+          <span className="phase-tag">Phases 02–05</span>
+          <h3>Chain, flagship app, and the long tail</h3>
           <p>
-            The proposed Ethereum L2 appchain economic layer: decentralized <code>.bso</code>{" "}
-            domains, awards and tipping, common liquidity, and practical monetization for Bitsocial
-            apps.
-          </p>
-        </li>
-        <li>
-          <span className="phase-tag">Phase 03</span>
-          <h3>Launch the flagship Bitsocial app</h3>
-          <p>
-            The first profile-based client: posts, follows, real-time public conversation. As
-            familiar as a modern For-You app, while letting users switch RPCs, feeds, algorithms, or
-            remove ranking entirely.
-          </p>
-        </li>
-        <li>
-          <span className="phase-tag">Phase 04</span>
-          <h3>Scale Bitsocial economies</h3>
-          <p>
-            Infrastructure pluralism: many competing RPCs, hosting, discovery, and moderation
-            services. Forge&apos;s RPC should not be the only successful RPC. That is the point.
-          </p>
-        </li>
-        <li>
-          <span className="phase-tag">Phase 05</span>
-          <h3>Decentralize all social media</h3>
-          <p>
-            Fund and build the long tail of social clients: blogging, crowdfunding, creator video,
-            and every format too early for the first four phases.
+            The roadmap continues with the Bitsocial Chain economic layer, a flagship
+            profile-based client, competing infrastructure providers, and the long tail of social
+            clients. Forge&apos;s RPC should not be the only successful RPC. That is the point.{" "}
+            <a href="https://bitsocial.net" rel="noopener">
+              Read the full master plan
+            </a>
+            .
           </p>
         </li>
       </ol>
