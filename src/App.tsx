@@ -237,7 +237,7 @@ function ForgeImages() {
       <div className="sec-head">
         <span className="sec-num">02</span>
         <h2>Forge Images</h2>
-        <span className="badge">Coming soon</span>
+        <span className="badge">In development</span>
       </div>
       <p className="sec-intro">
         <strong>Free media hosting for the open social web.</strong> Forge Images is a Catbox-like
@@ -294,7 +294,7 @@ function ForgeImages() {
       </div>
 
       <p className="rpc-note">
-        Coming soon. Public uploads will open only after legal, abuse-response, moderation,
+        In development. Public uploads will open only after legal, abuse-response, moderation,
         security, and infrastructure launch gates are complete.
       </p>
     </section>
@@ -403,12 +403,6 @@ function SiteFooter() {
           </a>
           <a href="https://x.com/bitsocialforge" rel="noopener">
             x / twitter
-          </a>
-          <a href="https://5chan.app" rel="noopener">
-            5chan
-          </a>
-          <a href="https://seedit.app" rel="noopener">
-            seedit
           </a>
         </nav>
         <p className="colophon">
