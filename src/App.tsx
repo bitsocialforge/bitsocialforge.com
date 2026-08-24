@@ -230,12 +230,83 @@ function ForgeRpc() {
   );
 }
 
+function ForgeImages() {
+  return (
+    <section id="forge-images" aria-label="Forge Images">
+      <hr className="heat-rule" />
+      <div className="sec-head">
+        <span className="sec-num">02</span>
+        <h2>Forge Images</h2>
+        <span className="badge">Coming soon</span>
+      </div>
+      <p className="sec-intro">
+        <strong>Free media hosting for the open social web.</strong> Forge Images is a Catbox-like
+        utility for uploading images, GIFs, and video from Bitsocial clients. Its first integration
+        will make the upload button in 5chan&apos;s web post form work directly in the browser.
+      </p>
+      <p className="sec-intro">
+        Forge Images is <strong>free by design</strong>: no paid hosting tiers, subscriptions, or
+        per-upload fees. Voluntary support may help fund the service, but it will never change
+        access, limits, retention, moderation, or availability.
+      </p>
+
+      <div className="spec">
+        <div className="spec-row">
+          <span className="k">free</span>
+          <div>
+            <h3>No hosting paywall</h3>
+            <p>
+              Anonymous uploads and free integration credentials use abuse controls, not a pricing
+              ladder. Paying for Forge RPC will never unlock Forge Images privileges.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">direct</span>
+          <div>
+            <h3>Built into the post form</h3>
+            <p>
+              Browser users choose a file, Forge Images uploads it, and the resulting media URL is
+              inserted into the post. No separate uploader tab or webview automation.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">durable</span>
+          <div>
+            <h3>Content-addressed, with no expiry</h3>
+            <p>
+              Files use stable, content-addressed URLs and do not expire because of age or
+              inactivity. Legal and abuse removals still apply.
+            </p>
+          </div>
+        </div>
+        <div className="spec-row">
+          <span className="k">safety</span>
+          <div>
+            <h3>Moderated before serving</h3>
+            <p>
+              New uploads stay private until required automated checks complete. Reports, takedowns,
+              hash blocking, and human review are part of the service design.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="rpc-note">
+        Coming soon. Public uploads will open only after legal, abuse-response, moderation,
+        security, and infrastructure launch gates are complete.
+      </p>
+    </section>
+  );
+}
+
 function MasterPlan() {
   return (
     <section id="master-plan" aria-label="Master plan">
       <hr className="heat-rule" />
       <div className="sec-head">
-        <span className="sec-num">02</span>
+        <span className="sec-num">03</span>
         <h2>Master Plan</h2>
       </div>
       <p className="sec-intro">
@@ -359,6 +430,7 @@ export function App() {
         <main>
           <Hero />
           <ForgeRpc />
+          <ForgeImages />
           <MasterPlan />
         </main>
       </div>
