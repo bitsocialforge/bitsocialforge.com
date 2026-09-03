@@ -37,7 +37,7 @@
     "portless": "0.11.1"
   },
   "resolutions": {
-    "nanoid@npm:^3.3.16": "npm:3.3.17",
+    "nanoid@npm:^3.3.16": "npm:3.3.18",
     "postcss": "8.5.23",
     "tar": "7.5.22",
     "undici@npm:^8.4.1": "npm:8.9.0"
