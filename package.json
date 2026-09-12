@@ -17,7 +17,11 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "type-check": "tsc --noEmit",
     "lint": "oxlint src/**/*.{ts,tsx}",
-    "format": "oxfmt src/**/*.{ts,tsx}"
+    "format": "oxfmt src/**/*.{ts,tsx}",
+    "ai-workflow:sync": "node scripts/sync-ai-workflow.mjs",
+    "ai-workflow:check": "node scripts/validate-ai-workflow.mjs",
+    "ai-workflow:test": "node --test scripts/__tests__/ai-workflow.node-test.mjs scripts/__tests__/agent-hooks.node-test.mjs",
+    "agent:verify": "bash scripts/verify.sh"
   },
   "dependencies": {
     "@vercel/analytics": "2.0.1",
@@ -28,8 +32,11 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.3",
+    "cross-spawn": "7.0.6",
+    "js-yaml": "4.3.1",
     "oxfmt": "0.57.0",
     "oxlint": "1.72.0",
+    "smol-toml": "1.6.1",
     "typescript": "7.0.2",
     "vite": "8.1.3"
   },

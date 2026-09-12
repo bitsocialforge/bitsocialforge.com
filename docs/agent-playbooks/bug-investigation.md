@@ -29,4 +29,4 @@ git show <commit-hash> -- index.html
 
 ## Troubleshooting Rule
 
-When blocked, search the web for recent fixes/workarounds.
+Use current official documentation when the remaining uncertainty concerns a dependency or platform version. Report a specific missing private-source or user-only reproduction detail when that prevents progress; continue independent checks.

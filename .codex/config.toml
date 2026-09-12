@@ -1,15 +1,3 @@
 [agents]
-max_threads = 8
+max_concurrent_threads_per_session = 4
 max_depth = 1
-
-[agents.browser-check]
-description = "Browser verification agent for UI changes using playwright-cli across Blink, Gecko, and WebKit on the local static site."
-config_file = "agents/browser-check.toml"
-
-[agents.code-quality]
-description = "Code quality agent that checks local asset resolution, HTML structure, CSS variable usage, and console errors, then fixes only issues surfaced by those checks."
-config_file = "agents/code-quality.toml"
-
-[agents.plan-implementer]
-description = "Implementation-focused agent for scoped tasks from a parent plan."
-config_file = "agents/plan-implementer.toml"

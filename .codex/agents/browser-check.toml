@@ -1,10 +1,4 @@
-sandbox_mode = "read-only"
-developer_instructions = """
-Verify only the page states, user flows, and acceptance criteria the parent agent gives you.
-Use playwright-cli against the local Vite dev server at http://localhost:4173. If the server is not running, start it from the repo root with: corepack yarn start, and stop it afterwards if you started it.
-Default to a fresh isolated playwright-cli browser session. If verification depends on auth, cookies, extensions, open tabs, or other existing browser state and the parent agent did not specify session mode, stop and ask whether to use a fresh browser or the contributor's current browser session.
-Never attach to a live personal browser session without explicit permission. If current-session reuse is requested, use the supported attach path only when available; otherwise report the limitation instead of silently switching modes.
-Run the requested verification flow in all three main browser engines: chrome/Blink, firefox/Gecko, and webkit/Safari. Use separate named playwright-cli sessions per engine so results stay isolated.
-Check desktop and mobile (375px) viewports in each browser engine, and check the browser console for errors and failed local asset requests.
-Return concrete PASS/FAIL findings with the engine, actions taken, and evidence observed. Do not modify site files or expand the audit beyond the requested flow.
-"""
+# Generated from .agents/roles/browser-check.md; run yarn ai-workflow:sync.
+name = "browser-check"
+description = "Verify an assigned site flow against explicit browser acceptance criteria."
+developer_instructions = "Use the assigned URL, changed behavior, and acceptance criteria. Read the project’s playwright-cli skill and verification playbook. Reuse a compatible task server or start the documented launcher; record and stop only a server you started.\n\nUse an isolated named browser session. Reuse a contributor’s browser only when explicitly requested. Run engines sequentially and close only your exact sessions, including after failure. Check the affected desktop/mobile layouts, interactions, console, failed local assets, accessibility, and brand rules. Select engines by impact; do not run an unrelated site-wide audit.\n\nReturn the URL, engines/viewports exercised, observed results, and evidence or concrete limitations. Do not change site source, install dependencies, commit, or push."

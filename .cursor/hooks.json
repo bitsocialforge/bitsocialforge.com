@@ -1,10 +1,10 @@
 {
   "version": 1,
   "hooks": {
-    "stop": [
-      { "command": "./.cursor/hooks/sync-git-branches.sh" },
-      { "command": "./.cursor/hooks/code-quality-review-reminder.sh" },
-      { "command": "./.cursor/hooks/verify.sh" }
+    "afterFileEdit": [
+      {
+        "command": "./.cursor/hooks/format.sh"
+      }
     ]
   }
 }

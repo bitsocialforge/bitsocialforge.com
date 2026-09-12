@@ -27,3 +27,7 @@ jobs:
         run: corepack yarn lint
       - name: Build
         run: corepack yarn build
+      - name: Check AI workflow generation
+        run: corepack yarn ai-workflow:check
+      - name: Test AI workflow fixtures
+        run: corepack yarn ai-workflow:test

@@ -1,6 +1,6 @@
 # Commit and Issue Format
 
-Use this when proposing or implementing meaningful code changes.
+Use this when commit or issue wording is requested, or an authorized commit or issue is being created.
 
 The committed `commit-format` and `issue-format` skills are the canonical, stricter templates with self-checks; prefer them when the harness loads skills. This playbook is the short fallback summary. Keep the two in sync.
 

@@ -1,79 +1,43 @@
-# Skills and Tools
+# Skills and tools
 
-Use this playbook when setting up or adjusting skills and external tooling, or to discover what is already committed.
-
-## Committed Skills Index
-
-These live in `.claude/skills/`, `.cursor/skills/`, and `.codex/skills/` (mirrored; run `node scripts/validate-ai-workflow.mjs` after edits). Repo skill files are committed; runtime app dependencies still install through Yarn.
-
-| Skill | Use when |
-| ----- | -------- |
-| `commit` | Committing current work with logical scoped commits |
-| `commit-format` / `issue-format` | Formatting commit or issue suggestions in chat output |
-| `make-closed-issue` | Creating an issue plus review branch and PR into `master` for already-done work |
-| `review-and-merge-pr` | Triaging bot, CI, and human PR feedback, fixing valid findings, merging, and cleaning up |
-| `fix-merge-conflicts` | Resolving merge conflicts non-interactively and validating the Vite site |
-| `code-quality-review` | Advisory pre-push/pre-PR quality pass on the current diff |
-| `refactor-pass` | Simplicity-focused refactor of recent changes |
-| `deslop` | Removing AI-generated slop from the branch diff |
-| `debug-agent` | Evidence-based debugging with runtime logs |
-| `frontend-design` | Distinctive, production-grade frontend design guidance for net-new pages or sections |
-| `impeccable` | Frontend design entry point with design subcommands (`/impeccable`) |
-| `playwright-cli` | Browser automation and cross-engine UI verification |
-| `implement-plan` | Executing a multi-task plan via `plan-implementer` subagents |
-| `readme` | Creating or updating README.md |
-| `context7` | Fetching up-to-date library docs |
-| `find-skills` | Discovering or installing ecosystem skills |
-
-## Committed Subagents
-
-Defined in `.claude/agents/*.md`, `.cursor/agents/*.md`, `.codex/agents/*.toml` plus `.codex/config.toml` entries:
-
-- `browser-check`
-- `code-quality`
-- `plan-implementer`
-
-Read the agent file before spawning one directly.
-
-## Playwright CLI
-
-Use `playwright-cli` for browser automation: navigation, interaction, screenshots, tests, and extraction.
-
-The local dev URL is `http://localhost:4173`. Start the Vite dev server first if needed:
+Edit `.agents/skills/` and `.agents/roles/`, then run:
 
 ```bash
-corepack yarn start
+corepack yarn ai-workflow:sync
+corepack yarn ai-workflow:check
+corepack yarn ai-workflow:test
 ```
 
-Default to a fresh isolated browser session for normal verification. If the task depends on the contributor's existing browser state, ask whether they want:
+Commit the shared sources and resulting native files together. The check detects missing/drifted outputs and obsolete compatibility files; synchronization never silently deletes files. Do not edit generated copies directly.
 
-- a fresh isolated `playwright-cli` session
-- their current browser session reused
+## Native discovery and generation
 
-Do not attach to a live personal browser session without explicit confirmation.
+`.agents/roles/` is a repository-specific source format consumed by `scripts/ai-workflow-files.mjs`; no app is expected to discover it. It is deliberately separate from native configuration:
 
-When using `playwright-cli` for repo UI verification, run the relevant flow in all three main browser engines:
+| App | Skills | Custom agents | Project instructions |
+|---|---|---|---|
+| Codex | `.agents/skills/<name>/SKILL.md` | Generated `.codex/agents/*.toml` | Root and scoped `AGENTS.md` |
+| Cursor | `.agents/skills/<name>/SKILL.md` | Generated `.cursor/agents/*.md` | `AGENTS.md`; `.cursor/rules` remains available for conditional rules |
+| Claude Code | Generated `.claude/skills/<name>/SKILL.md` | Generated `.claude/agents/*.md` | `CLAUDE.md` imports `@AGENTS.md` |
 
-- `chrome` for Blink
-- `firefox` for Gecko
-- `webkit` for Safari/WebKit coverage
+Official references: [Codex skills](https://learn.chatgpt.com/docs/build-skills), [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Cursor skills](https://cursor.com/docs/skills), [Cursor agents](https://cursor.com/docs/subagents), [Cursor rules](https://cursor.com/docs/rules), [Claude skills](https://code.claude.com/docs/en/skills), [Claude agents](https://code.claude.com/docs/en/sub-agents), and [Claude memory imports](https://code.claude.com/docs/en/memory).
 
-Use separate named sessions per engine so evidence stays isolated. If an engine is intentionally skipped, record why.
+The source role fields are `name`, `description`, and optional `sandbox-mode`. The generator renders the name, description, and instructions in each native schema. A read-only role gets Codex `sandbox_mode`, Cursor `readonly`, and Claude’s Bash/Read/Grep/Glob tool list. Claude’s tool list is not an OS sandbox: the instructions still prohibit mutations.
 
-```bash
-npm install -g @playwright/cli@latest
-playwright-cli install --skills
-```
+Model and reasoning fields are omitted from skills and agent definitions. The app, user settings, and supported invocation overrides choose or inherit them. This avoids generation-specific pins without promising that inheritance dynamically selects the best model. The generator rejects source role model fields.
 
-## MCP Policy Rationale
+Keep hook configuration, permissions, plugin settings, and launch metadata native; they are not interchangeable. See [hooks-setup.md](hooks-setup.md). Workflow tests establish parsed schemas, deterministic generation, and hook behavior using disposable fixtures; they do not prove end-to-end delegation in each installed app. Trust settings and app discovery/reload behavior still apply. Cursor can also discover Claude compatibility skill directories; its published precedence for duplicate names is unspecified.
 
-Avoid GitHub MCP and browser MCP servers for this project because they add significant tool-schema/context overhead.
+## Maintaining instructions
 
-- GitHub operations: use `gh` CLI.
-- Browser operations: use `playwright-cli`.
-- If current browser reuse is needed, keep using Playwright-based attach paths rather than browser MCP servers.
+Keep skill descriptions short and specific. Put only essential decisions in `SKILL.md`; load references for the modes that need them. Preserve invocation policy, supported metadata, licensed resources, and task-specific constraints when shortening a skill. Do not turn a suggested process into a new approval gate, fixed agent chain, automatic commit, or blanket full-suite requirement.
 
-## Model Availability
+Use `.agents/skills` for deliberate repository skill additions. Ordinary coding tasks should use installed capabilities; skill discovery and installation require a relevant request. Use built-in workers for ordinary implementation, with explicit file ownership. Custom roles cover independent review and genuinely specialized verification.
 
-- `composer-2` family models are available only in Cursor. Do not configure them under `.claude/` or `.codex/`.
-- Codex does not document a `latest` model alias. Committed custom-agent TOMLs under `.codex/**/agents/*.toml` omit both `model` and `model_reasoning_effort` so they inherit the current parent session settings.
+This follows the principles in OpenAI’s [rethinking skills and prompts](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra) article, reviewed September 12, 2026. Validate model behavior with narrow realistic requests when useful, distinct from the deterministic workflow tests.
+
+## Repository-specific tools
+
+`impeccable` and `frontend-design` retain their licensed design references and scripts. The company’s pinned identity and factual copy rules in `AGENTS.md` take priority over generic aesthetics. Use `playwright-cli` for scoped browser verification; the `browser-check` role reports evidence without editing source. The `reviewer` role performs independent diff review.
+
+Use `gh` for GitHub operations and the installed Vercel tools when deployment is in scope. No automatic plugin installation or deployment is part of a skill migration.

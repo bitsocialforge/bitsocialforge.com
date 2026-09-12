@@ -1,22 +1,13 @@
 {
   "hooks": {
-    "Stop": [
+    "PostToolUse": [
       {
+        "matcher": "apply_patch",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/sync-git-branches.sh\"",
-            "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/code-quality-review-reminder.sh\"",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/format.sh\"",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/verify.sh\"",
-            "timeout": 120
           }
         ]
       }
