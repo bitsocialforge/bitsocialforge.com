@@ -69,6 +69,7 @@ protocol** — copy on the site must never blur that line.
 | Code, automation, or build | Select affected checks using [verification.md](docs/agent-playbooks/verification.md); `yarn agent:verify` is the explicit integration pass |
 | `package.json` | Run `corepack yarn install` and include `yarn.lock` |
 | AI workflow files | Edit shared sources; run `yarn ai-workflow:sync`, `yarn ai-workflow:check`, and `yarn ai-workflow:test` |
+| Bug fix or substantive review correction exposes a preventable mistake | Use [retro](.agents/skills/retro/SKILL.md) before finishing; preserve review-only scope. |
 | PR feedback/readiness | Use `review-and-merge-pr` within the requested scope |
 | Hosting or DNS | Read [deployment.md](docs/agent-playbooks/deployment.md); credentials stay outside the repository |
 
