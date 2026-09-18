@@ -79,6 +79,7 @@ protocol** — copy on the site must never blur that line.
 - TypeScript is the default for new source files. Use `.tsx` for React components and `.ts` for non-component code; do not add plain `.js` app code unless a dependency or platform boundary requires it.
 - Keep the site a static client app: no backend runtime, no server-side rendering, no forms that submit data, no wallet integration, and no authentication in this repo.
 - Self-hosted fonts only (`fonts/*.woff2` via `fonts/fonts.css`). No external CDNs, trackers, or analytics without an explicit user request.
+- Agentation is a dev-only annotation toolbar mounted from `src/lib/dev-tools.ts` into its own React root; it is stripped from production builds. Set `window.__NO_DEV_TOOLBAR__` or `window.__VISUAL_TESTING__` before load to suppress it during browser automation.
 - Vercel static hosting builds `dist` from Vite; every push to `master` on `bitsocialforge/bitsocialforge.com` auto-deploys production.
 - Cloudflare DNS (DNS-scope API token lives outside the repo; never commit credentials).
 
