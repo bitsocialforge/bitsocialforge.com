@@ -148,7 +148,12 @@ a:focus-visible, button:focus-visible {
 .topbar-frosted {
   position: relative;
   isolation: isolate;
+  /* clip, not hidden: `hidden` makes this a scroll container, and the hidden
+     measurement copy of the desktop nav overflows it on narrow viewports, so
+     focusing the hamburger scrolled the whole bar sideways and cut the menu
+     labels off. `clip` keeps the rounded-corner clipping without scrolling. */
   overflow: hidden;
+  overflow: clip;
   /* Swapped instantly (no transition): interpolating from 9999px stays above the
      corner clamp for almost the whole duration, so the open animation would clip
      the menu as a huge lozenge and snap at the end. */
@@ -204,13 +209,14 @@ a:focus-visible, button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 36px;
+  min-height: 2.75rem;
 }
 
 .topbar-brand {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 2.75rem;
   flex-shrink: 0;
   color: var(--text-dim);
   transition: color 0.2s ease;
@@ -250,14 +256,23 @@ a:focus-visible, button:focus-visible {
   align-items: center;
 }
 
+.topbar-desktop-nav {
+  min-height: 2.75rem;
+}
+
 .topbar-links {
   gap: 20px;
 }
 
+/* Every topbar control is an explicit 44px flex-centred box on every pointer type.
+   A coarse-pointer-only minimum instead grows the stacked links on touch without
+   re-centring their labels, so the bar reads differently on a phone than on a laptop. */
 .topbar-link {
   position: relative;
-  display: block;
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 8px;
   font-family: var(--font-display);
   font-size: 1.125rem;
   line-height: 1;
@@ -265,10 +280,15 @@ a:focus-visible, button:focus-visible {
   transition: color 0.2s ease;
 }
 
+.topbar-desktop-nav .topbar-link {
+  height: 2.75rem;
+  min-width: 2.75rem;
+  justify-content: center;
+}
+
 @media (min-width: 768px) {
   .topbar-link {
     font-size: 1rem;
-    line-height: 1.5;
   }
 }
 
@@ -279,6 +299,7 @@ a:focus-visible, button:focus-visible {
 .topbar-compact-controls {
   display: flex;
   align-items: center;
+  min-height: 2.75rem;
   gap: 8px;
 }
 
@@ -286,8 +307,8 @@ a:focus-visible, button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 2.75rem;
+  height: 2.75rem;
   border: 0;
   background: transparent;
   color: var(--text-dim);
@@ -375,14 +396,14 @@ a:focus-visible, button:focus-visible {
 }
 
 .topbar-spacer {
-  height: 4.25rem;
+  height: 4.75rem;
   flex-shrink: 0;
 }
 
 .nojs-mobile-summary {
   display: flex;
-  height: 36px;
-  width: 36px;
+  height: 2.75rem;
+  width: 2.75rem;
   list-style: none;
   cursor: pointer;
   align-items: center;
@@ -722,9 +743,25 @@ section > .wrap > p, .sec-intro {
   font-size: 12.5px;
   letter-spacing: 0.08em;
 }
-.foot-links a { color: var(--text-dim); display: inline-block; padding: 4px 0; }
+/* Footer targets follow the pointer: a fine pointer keeps the compact rows, a coarse
+   pointer gets larger type and 44px hit areas, which is what opens the spacing up on
+   mobile. The explicit gap replaces the space that flex layout trims from the arrow. */
+.foot-links a {
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 4px 0;
+}
+@media (pointer: coarse) {
+  .foot-links a {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    font-size: 14px;
+  }
+}
 .foot-links a:hover { color: var(--ember-hot); }
-.foot-links a::before { content: "→ "; color: var(--line); }
+.foot-links a::before { content: "→"; color: var(--line); }
 .colophon {
   width: 100%;
   margin-top: 26px;
