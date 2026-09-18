@@ -1,7 +1,7 @@
 ---
 name: playwright-cli
 description: Verify an affected site flow or reproduce a UI issue with the installed Playwright CLI.
-allowed-tools: Bash(playwright-cli:*), Bash(./scripts/pw-session.sh:*)
+allowed-tools: Bash(playwright-cli:*), Bash(./scripts/pw-session.sh:*), Bash(node scripts/jev/browser.mjs:*)
 ---
 
 # Browser verification
