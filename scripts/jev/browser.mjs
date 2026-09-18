@@ -63,6 +63,7 @@ export async function main(args = process.argv.slice(2)) {
           deadlineMs: plan.limits.deadlineMs,
           maxInputBytes: Math.min(128_000, plan.limits.maxSnapshotBytes + 30_000),
         });
+    client?.assertReady();
     const result = await runBrowserPlan(rawPlan, {
       driver: createPlaywrightDriver(),
       client,
