@@ -10,3 +10,5 @@ Open and close an isolated named browser session through `./scripts/pw-session.s
 Return the URL, engines/viewports exercised, observed results, and evidence or concrete limitations. Do not change site source, install dependencies, commit, or push.
 
 For a bounded multi-step check, the optional helper in `scripts/jev/README.md` can choose among explicitly permitted controls and verify text meaning. Its plan must contain deterministic completion assertions; a model verdict alone never establishes success. Use it only when the task authorizes provider calls and the runtime supplies credentials, a pinned model, and a request budget. Do not open a second session around the helper: it owns its isolated session through the existing lock. Keep deterministic tests and Bippy measurements as the source of behavioral and performance evidence.
+
+The private machine config is shared across checkouts/worktrees. Use `node scripts/jev/config.mjs --check` for safe readiness diagnostics; the helper loads the key itself. Do not print or copy credentials into a repo `.env`.

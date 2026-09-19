@@ -1,7 +1,7 @@
 ---
 name: playwright-cli
 description: Verify an affected site flow or reproduce a UI issue with the installed Playwright CLI.
-allowed-tools: Bash(playwright-cli:*), Bash(./scripts/pw-session.sh:*), Bash(node scripts/jev/browser.mjs:*)
+allowed-tools: Bash(playwright-cli:*), Bash(./scripts/pw-session.sh:*), Bash(node scripts/jev/browser.mjs:*), Bash(node scripts/jev/config.mjs:*)
 ---
 
 # Browser verification
@@ -29,3 +29,5 @@ Report the observed result, URL, engines/viewports, and relevant evidence. Page,
 ## Optional Jev checks
 
 See `scripts/jev/README.md` for the bounded browser helper. A task-owned plan lists permitted controls/actions and deterministic completion assertions; the helper observes a fresh snapshot before each choice and owns its isolated browser session. Use semantic checks for text meaning or qualitative requirements after ordinary assertions, and report uncertainty as unverified. Run offline plan validation first. Provider calls require explicit `--live`, a runtime-selected pinned model, credentials, and a budget. Prefer ordinary scripted checks for known fixed flows; do not add model calls to edit hooks or replace Bippy measurements.
+
+The helper automatically reads the private machine configuration documented there, shared across checkouts and worktrees; runtime environment overrides also work. Run `node scripts/jev/config.mjs --check` to verify readiness without an API call. Do not read/print the key yourself, copy it into a repo `.env`, or request it again when setup is ready. Use `--live` for the task's bounded, authorized Jev checks.
