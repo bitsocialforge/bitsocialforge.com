@@ -74,6 +74,69 @@ const terminalLines: Array<{ delay: string; children: ReactNode }> = [
   },
 ];
 
+type CustodyStep = {
+  holder: string;
+  title: string;
+  body: string;
+};
+
+const custodySteps: CustodyStep[] = [
+  {
+    holder: "you · offline",
+    title: "Anchor key",
+    body: "Your community's identity. Handed to you once at creation and never stored by Forge.",
+  },
+  {
+    holder: "forge · online",
+    title: "Minter key",
+    body: "Signs routine updates on your behalf. It only counts while your anchor points to it.",
+  },
+  {
+    holder: "network · p2p",
+    title: "Your community",
+    body: "Its address derives from your anchor key, so it outlives any single host.",
+  },
+];
+
+type SheetRow = {
+  key: string;
+  lead: string;
+  body: string;
+};
+
+const imagesSheet: SheetRow[] = [
+  {
+    key: "price",
+    lead: "Free.",
+    body: "No paid tiers, subscriptions, or per-upload fees. Voluntary support never changes access, limits, retention, moderation, or availability.",
+  },
+  {
+    key: "access",
+    lead: "Anonymous uploads.",
+    body: "Abuse controls, not a pricing ladder, and free credentials for client integrations. Paying for Forge RPC unlocks nothing here.",
+  },
+  {
+    key: "links",
+    lead: "Content-addressed, no expiry.",
+    body: "Stable URLs that do not lapse from age or inactivity. Legal and abuse removals still apply.",
+  },
+  {
+    key: "privacy",
+    lead: "Metadata stripped.",
+    body: "EXIF, GPS, and other embedded metadata are removed before a file is served.",
+  },
+  {
+    key: "review",
+    lead: "Moderated before serving.",
+    body: "New uploads stay private until automated checks clear, backed by reports, takedowns, hash blocking, and human review.",
+  },
+  {
+    key: "scope",
+    lead: "One provider, not a filter.",
+    body: "Forge Images moderates what it hosts. Clients keep their own list of upload providers, so no single host decides what the network can see.",
+  },
+];
+
 function emberStyle(ember: Ember): CustomProperties {
   return {
     "--x": ember.x,
@@ -106,7 +169,11 @@ function Atmosphere() {
 
 function TerminalDemo() {
   return (
-    <div className="terminal" aria-label="Terminal demo">
+    <div
+      className="terminal"
+      role="img"
+      aria-label="Illustration: creating a community with Forge RPC returns its anchor key to the owner, and Forge never stores it."
+    >
       <div className="term-bar" aria-hidden="true">
         <i />
         <i />
@@ -153,6 +220,32 @@ function Hero() {
   );
 }
 
+function CustodyChain() {
+  return (
+    <figure className="custody">
+      <figcaption className="fig-cap">Who holds which key</figcaption>
+      <ol className="custody-steps">
+        {custodySteps.map((step) => (
+          <li key={step.title}>
+            <span className="custody-node" aria-hidden="true" />
+            <span className="k">{step.holder}</span>
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="custody-exit">
+        <span className="k">exit</span>
+        <span>
+          Sign a new anchor record pointing at your own node or a rival RPC, and Forge&apos;s minter
+          key stops counting. Settings, content, signed moderation logs, and ownership history
+          export at any time.
+        </span>
+      </p>
+    </figure>
+  );
+}
+
 function ForgeRpc() {
   return (
     <section id="forge-rpc" aria-label="Forge RPC">
@@ -163,60 +256,22 @@ function ForgeRpc() {
         <span className="badge">In development</span>
       </div>
       <p className="sec-intro">
-        <strong>The first public Bitsocial RPC service.</strong> Forge RPC is for Bitsocial what
-        Infura is for Ethereum: hosted infrastructure that lets anyone create and manage always-on
-        p2p communities, including from mobile, without running their own node on day one.
+        <strong>The first public Bitsocial RPC.</strong> Forge RPC is for Bitsocial what Infura is
+        for Ethereum: hosted nodes that keep your communities online, so you can create and run them
+        from a browser or a phone with nothing more than a credential and a websocket.
       </p>
       <p className="sec-intro">
-        Unlike blockchain infrastructure, Bitsocial nodes are light: they run on a Raspberry Pi and
-        serve text-first content that users themselves can seed. The public RPC is{" "}
+        Bitsocial nodes are light enough for a Raspberry Pi, so hosting is a convenience you can
+        leave, not a dependency. Forge RPC is{" "}
         <strong>convenience infrastructure, not the owner of the protocol</strong>.
       </p>
 
-      <div className="spec">
-        <div className="spec-row">
-          <span className="k">custody</span>
-          <div>
-            <h3>Non-custodial by design</h3>
-            <p>
-              Your community&apos;s anchor key is returned to you once, at creation, and never
-              stored. Forge publishes on your behalf with a rotatable delegate key, so identity
-              stays tied to your keys, not our database.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">exit</span>
-          <div>
-            <h3>Exit, preserved</h3>
-            <p>
-              Export settings, content, signed moderation logs, and ownership history at any time.
-              Re-point your community to a competing RPC or a self-hosted node. Identity survives
-              without Forge&apos;s cooperation.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">mobile</span>
-          <div>
-            <h3>Unstoppable, from a phone</h3>
-            <p>
-              Create and manage p2p communities from mobile. All it takes is a durable credential
-              and a websocket. No local node required, self-hosting always optional.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">retention</span>
-          <div>
-            <h3>Earned, not enforced</h3>
-            <p>
-              Reasons to stay are earned: uptime, moderation tooling, challenge editing with
-              rollback, backups, analytics, and ad-free paid tiers. Never lock-in.
-            </p>
-          </div>
-        </div>
-      </div>
+      <CustodyChain />
+
+      <p className="earned">
+        Reasons to stay are <strong>earned, not enforced</strong>: uptime, moderation tooling,
+        challenge editing with rollback, backups, analytics, and ad-free paid tiers.
+      </p>
 
       <p className="rpc-note">
         Dashboard launching at <code>rpc.bitsocialforge.com</code>. Follow{" "}
@@ -239,62 +294,26 @@ function ForgeImages() {
         <span className="badge">In development</span>
       </div>
       <p className="sec-intro">
-        <strong>Free media hosting for the open social web.</strong> Forge Images is a Catbox-like
-        utility for uploading images, GIFs, and video from Bitsocial clients. Its first integration
-        will make the upload button in 5chan&apos;s web post form work directly in the browser.
-      </p>
-      <p className="sec-intro">
-        Forge Images is <strong>free by design</strong>: no paid hosting tiers, subscriptions, or
-        per-upload fees. Voluntary support may help fund the service, but it will never change
-        access, limits, retention, moderation, or availability.
+        <strong>Free media hosting for the open social web.</strong> A Catbox-like host for images,
+        GIFs, and video uploaded from Bitsocial clients. Its first job is the upload button in
+        5chan&apos;s web post form: pick a file and the media URL lands in your post, with no
+        separate uploader tab.
       </p>
 
-      <div className="spec">
-        <div className="spec-row">
-          <span className="k">free</span>
-          <div>
-            <h3>No hosting paywall</h3>
-            <p>
-              Anonymous uploads and free integration credentials use abuse controls, not a pricing
-              ladder. Paying for Forge RPC will never unlock Forge Images privileges.
-            </p>
+      <dl className="sheet">
+        {imagesSheet.map((row) => (
+          <div className="sheet-row" key={row.key}>
+            <dt>{row.key}</dt>
+            <dd>
+              <strong>{row.lead}</strong> {row.body}
+            </dd>
           </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">direct</span>
-          <div>
-            <h3>Built into the post form</h3>
-            <p>
-              Browser users choose a file, Forge Images uploads it, and the resulting media URL is
-              inserted into the post. No separate uploader tab or webview automation.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">durable</span>
-          <div>
-            <h3>Content-addressed, with no expiry</h3>
-            <p>
-              Files use stable, content-addressed URLs and do not expire because of age or
-              inactivity. Legal and abuse removals still apply.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">safety</span>
-          <div>
-            <h3>Moderated before serving</h3>
-            <p>
-              New uploads stay private until required automated checks complete. Reports, takedowns,
-              hash blocking, and human review are part of the service design.
-            </p>
-          </div>
-        </div>
-      </div>
+        ))}
+      </dl>
 
       <p className="rpc-note">
-        In development. Public uploads will open only after legal, abuse-response, moderation,
-        security, and infrastructure launch gates are complete.
+        Public uploads open only after legal, abuse-response, moderation, security, and
+        infrastructure launch gates are complete.
       </p>
     </section>
   );
@@ -317,63 +336,47 @@ function ForgeRole() {
         then work to make that market exist.
       </p>
 
-      <div className="spec">
-        <div className="spec-row">
-          <span className="k">first</span>
-          <div>
-            <h3>First services, not the only ones</h3>
-            <p>
-              Forge RPC and Forge Images exist because a peer-to-peer network still needs someone to
-              run the unglamorous parts on day one. Being first is a starting position, not a claim
-              on the category.
-            </p>
-          </div>
+      <div className="split">
+        <div className="split-side">
+          <span className="k">protocol</span>
+          <h3>Bitsocial</h3>
+          <p>Open source and owned by nobody. 5chan, Seedit, and the shared client libraries.</p>
+          <a href="https://github.com/bitsocialnet" rel="noopener">
+            github.com/bitsocialnet
+          </a>
         </div>
-        <div className="spec-row">
-          <span className="k">interop</span>
-          <div>
-            <h3>Tooling for our own competition</h3>
-            <p>
-              The wire-protocol client package and the reference operator dashboard are built to be
-              published, so rival RPCs stay wire-compatible and can run the same tooling against
-              their own servers. No Forge code required to compete with Forge.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">fund</span>
-          <div>
-            <h3>Revenue routed back out</h3>
-            <p>
-              The plan for a profitable Forge is to fund the ecosystem it competes in: independent
-              clients, competing RPCs, media hosts, moderation and indexing tools, through
-              investment, grants, and community-decided funding. Intent, not a live program.
-            </p>
-          </div>
-        </div>
-        <div className="spec-row">
-          <span className="k">separate</span>
-          <div>
-            <h3>Protocol and company kept apart</h3>
-            <p>
-              The protocol, 5chan, Seedit, and the shared libraries live under{" "}
-              <a href="https://github.com/bitsocialnet" rel="noopener">
-                bitsocialnet
-              </a>
-              . Forge&apos;s products live under{" "}
-              <a href="https://github.com/bitsocialforge" rel="noopener">
-                bitsocialforge
-              </a>
-              . Different orgs, different owners, on purpose.
-            </p>
-          </div>
+        <div className="split-side">
+          <span className="k">company</span>
+          <h3>Bitsocial Forge Inc.</h3>
+          <p>Services that run on the protocol: Forge RPC and Forge Images.</p>
+          <a href="https://github.com/bitsocialforge" rel="noopener">
+            github.com/bitsocialforge
+          </a>
         </div>
       </div>
+
+      <ul className="tenets">
+        <li>
+          <strong>First, not only.</strong> A peer-to-peer network still needs someone to run the
+          unglamorous parts on day one. Being first is a starting position, not a claim on the
+          category.
+        </li>
+        <li>
+          <strong>Tooling for our own competition.</strong> The wire-protocol client package and
+          reference operator dashboard are built to be published, so rival RPCs stay wire-compatible
+          without any Forge code.
+        </li>
+        <li>
+          <strong>Revenue routed back out.</strong> A profitable Forge should fund the ecosystem it
+          competes in: independent clients, competing RPCs, media hosts, moderation and indexing
+          tools. Intent, not a live program.
+        </li>
+      </ul>
 
       <blockquote className="quote">
         <p>
           &quot;The end state is not one app. It is a market of clients, nodes, services, and
-          communities that replaces platform ownership with{" "}
+          communities that can replace platform ownership with{" "}
           <span className="hot">protocol competition</span>.&quot;
         </p>
         <footer>the Bitsocial master plan</footer>

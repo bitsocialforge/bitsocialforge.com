@@ -16,7 +16,7 @@ const TOPBAR_LINKS: TopbarLink[] = [
   { label: "Images", href: "#forge-images" },
   { label: "Role", href: "#forge-role" },
   { label: "Bitsocial", href: "https://bitsocial.net", external: true },
-  { label: "X", href: "https://x.com/bitsocialforge", external: true },
+  { label: "Twitter/X", href: "https://x.com/bitsocialforge", external: true },
 ];
 
 function TopbarNavLink({
