@@ -82,17 +82,17 @@ type CustodyStep = {
 
 const custodySteps: CustodyStep[] = [
   {
-    holder: "you · offline",
+    holder: "held by you · offline",
     title: "Anchor key",
     body: "Your community's identity. Handed to you once at creation and never stored by Forge.",
   },
   {
-    holder: "forge · online",
+    holder: "held by Forge · online",
     title: "Minter key",
     body: "Signs routine updates on your behalf. It only counts while your anchor points to it.",
   },
   {
-    holder: "network · p2p",
+    holder: "served peer-to-peer",
     title: "Your community",
     body: "Its address derives from your anchor key, so it outlives any single host.",
   },
@@ -222,14 +222,13 @@ function Hero() {
 
 function CustodyChain() {
   return (
-    <figure className="custody">
-      <figcaption className="fig-cap">Who holds which key</figcaption>
+    <div className="custody">
       <ol className="custody-steps">
         {custodySteps.map((step) => (
           <li key={step.title}>
             <span className="custody-node" aria-hidden="true" />
-            <span className="k">{step.holder}</span>
             <h3>{step.title}</h3>
+            <p className="custody-holder">{step.holder}</p>
             <p>{step.body}</p>
           </li>
         ))}
@@ -242,7 +241,7 @@ function CustodyChain() {
           export at any time.
         </span>
       </p>
-    </figure>
+    </div>
   );
 }
 
@@ -251,7 +250,6 @@ function ForgeRpc() {
     <section id="forge-rpc" aria-label="Forge RPC">
       <hr className="heat-rule" />
       <div className="sec-head">
-        <span className="sec-num">01</span>
         <h2>Forge RPC</h2>
         <span className="badge">In development</span>
       </div>
@@ -289,7 +287,6 @@ function ForgeImages() {
     <section id="forge-images" aria-label="Forge Images">
       <hr className="heat-rule" />
       <div className="sec-head">
-        <span className="sec-num">02</span>
         <h2>Forge Images</h2>
         <span className="badge">In development</span>
       </div>
@@ -324,7 +321,6 @@ function ForgeRole() {
     <section id="forge-role" aria-label="Forge's role">
       <hr className="heat-rule" />
       <div className="sec-head">
-        <span className="sec-num">03</span>
         <h2>Forge&apos;s Role</h2>
       </div>
       <p className="sec-intro">
@@ -332,23 +328,24 @@ function ForgeRole() {
         <a href="https://bitsocial.net" rel="noopener">
           the Bitsocial master plan
         </a>{" "}
-        from Phase 01: build the infrastructure the network needs before a market for it exists,
-        then work to make that market exist.
+        from Phase 1: build the infrastructure the network needs before a market for it exists, then
+        work to make that market exist.
       </p>
 
       <div className="split">
         <div className="split-side">
-          <span className="k">protocol</span>
           <h3>Bitsocial</h3>
-          <p>Open source and owned by nobody. 5chan, Seedit, and the shared client libraries.</p>
+          <p>
+            The protocol. Open source and owned by nobody, home to 5chan, Seedit, and the shared
+            client libraries.
+          </p>
           <a href="https://github.com/bitsocialnet" rel="noopener">
             github.com/bitsocialnet
           </a>
         </div>
         <div className="split-side">
-          <span className="k">company</span>
           <h3>Bitsocial Forge Inc.</h3>
-          <p>Services that run on the protocol: Forge RPC and Forge Images.</p>
+          <p>The company. It runs services on the protocol: Forge RPC and Forge Images.</p>
           <a href="https://github.com/bitsocialforge" rel="noopener">
             github.com/bitsocialforge
           </a>

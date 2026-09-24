@@ -52,8 +52,8 @@ Heat metaphor governs intensity: hotter = brighter = more important
 ## Layout
 
 - Single column, max-width 1060px, generous vertical rhythm (~96px sections).
-- Section headers: bracketed index (`[01]`) + uppercase display heading +
-  optional status badge.
+- Section headers: display heading + optional status badge. No index numbers:
+  the sections are not a sequence.
 - Mobile (≤760px): single column, nav links hidden, grid collapses.
 
 ## Hard Rules

@@ -603,22 +603,12 @@ section { padding: 96px 0 0; }
   gap: 18px;
   margin-bottom: 18px;
 }
-.sec-num {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 13px;
-  color: var(--text-dim);
-  letter-spacing: 0.1em;
-}
-.sec-num::before { content: "["; color: var(--line); }
-.sec-num::after { content: "]"; color: var(--line); }
 h2 {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: clamp(1.5rem, 3vw, 2rem);
   letter-spacing: 0;
   color: var(--ember);
-  text-shadow: 0 0 24px rgba(255, 106, 0, 0.3);
 }
 
 .badge {
@@ -640,10 +630,9 @@ section > .wrap > p, .sec-intro {
 }
 .sec-intro strong, section p strong { color: var(--white-hot); font-weight: 500; }
 
-/* ---- shared small-caps label --------------------------------------- */
+/* ---- small-caps label --------------------------------------------- */
 
-.k,
-.fig-cap {
+.k {
   display: block;
   font-size: 11px;
   letter-spacing: 0.24em;
@@ -654,7 +643,6 @@ section > .wrap > p, .sec-intro {
 /* ---- custody chain (Forge RPC) -------------------------------------- */
 
 .custody { margin-top: 52px; }
-.fig-cap { margin-bottom: 28px; }
 .custody-steps {
   list-style: none;
   display: grid;
@@ -673,10 +661,7 @@ section > .wrap > p, .sec-intro {
   background: var(--bg);
 }
 /* The anchor is the key the owner keeps, so it carries the heat. */
-.custody-steps li:first-child .custody-node {
-  background: var(--ember);
-  box-shadow: 0 0 16px rgba(255, 106, 0, 0.6);
-}
+.custody-steps li:first-child .custody-node { background: var(--ember); }
 .custody-steps li:not(:last-child)::after {
   content: "";
   position: absolute;
@@ -698,7 +683,6 @@ section > .wrap > p, .sec-intro {
   transform: rotate(45deg);
   opacity: 0.6;
 }
-.custody-steps .k { margin-bottom: 8px; }
 .custody-steps h3,
 .split h3 {
   font-family: var(--font-display);
@@ -709,6 +693,11 @@ section > .wrap > p, .sec-intro {
   margin-bottom: 8px;
 }
 .custody-steps p { font-size: 13.5px; }
+.custody-steps .custody-holder {
+  margin: -4px 0 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
 
 .custody-exit {
   display: grid;
@@ -770,7 +759,6 @@ section > .wrap > p, .sec-intro {
   padding: 28px 0 30px 36px;
   border-left: 1px solid var(--line-dim);
 }
-.split .k { margin-bottom: 10px; }
 .split p { font-size: 13.5px; margin-bottom: 14px; }
 .split a { font-size: 13px; }
 .split a::before { content: "→ "; color: var(--line); }
