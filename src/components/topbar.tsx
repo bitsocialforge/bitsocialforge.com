@@ -12,11 +12,11 @@ type TopbarLink = {
 };
 
 const TOPBAR_LINKS: TopbarLink[] = [
-  { label: "RPC", href: "#forge-rpc" },
+  { label: "Services", href: "#services" },
   { label: "Images", href: "#forge-images" },
+  { label: "RPC", href: "#forge-rpc" },
   { label: "Role", href: "#forge-role" },
   { label: "Bitsocial", href: "https://bitsocial.net", external: true },
-  { label: "Twitter/X", href: "https://x.com/bitsocialforge", external: true },
 ];
 
 function TopbarNavLink({

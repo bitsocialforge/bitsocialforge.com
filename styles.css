@@ -579,7 +579,7 @@ h1 .hot { color: var(--ember); }
 
 /* ---- sections ------------------------------------------------------ */
 
-section { padding: 96px 0 0; }
+section { padding: 96px 0 0; scroll-margin-top: 100px; }
 
 .heat-rule {
   height: 1px;
@@ -629,6 +629,69 @@ section > .wrap > p, .sec-intro {
   margin-bottom: 20px;
 }
 .sec-intro strong, section p strong { color: var(--white-hot); font-weight: 500; }
+
+/* ---- service directory --------------------------------------------- */
+
+.service-list {
+  list-style: none;
+  margin-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.service-list li { border-bottom: 1px solid var(--line); }
+.service-link {
+  display: grid;
+  grid-template-columns: minmax(245px, 1fr) minmax(0, 1.4fr) 24px;
+  align-items: center;
+  gap: 32px;
+  padding: 30px 20px;
+  color: var(--text);
+  transition: background 0.2s ease;
+}
+.service-link:hover,
+.service-link:focus-visible {
+  color: var(--text);
+  background: var(--bg-raised);
+}
+.service-link h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  color: var(--white-hot);
+  margin-bottom: 8px;
+}
+.service-domain {
+  color: var(--ember);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.service-link p { font-size: 13.5px; }
+.service-arrow {
+  color: var(--ember);
+  font-size: 24px;
+  line-height: 1;
+}
+.service-link:hover h3,
+.service-link:focus-visible h3 { color: var(--ember-hot); }
+.service-next { margin-top: 24px; font-size: 13px; }
+.service-next a { text-decoration: underline; text-underline-offset: 4px; }
+.images-action { margin-top: 28px; }
+.images-action .btn { display: inline-flex; align-items: center; gap: 12px; }
+
+@media (max-width: 760px) {
+  .service-link {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 16px;
+    padding: 26px 8px;
+  }
+  .service-identity { grid-column: 1; grid-row: 1; }
+  .service-arrow { grid-column: 2; grid-row: 1; }
+  .service-link p { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-link { transition: none; }
+}
 
 /* ---- small-caps label --------------------------------------------- */
 

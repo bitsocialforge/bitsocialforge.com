@@ -122,18 +122,42 @@ const imagesSheet: SheetRow[] = [
   },
   {
     key: "privacy",
-    lead: "Metadata stripped.",
-    body: "EXIF, GPS, and other embedded metadata are removed before a file is served.",
+    lead: "Metadata handling.",
+    body: "Metadata is removed from supported images and videos where possible. GIFs, SWFs, and files that cannot be processed safely stay unchanged. Remove sensitive metadata before uploading.",
   },
   {
     key: "review",
     lead: "Moderated before serving.",
-    body: "New uploads stay private until automated checks clear, backed by reports, takedowns, hash blocking, and human review.",
+    body: "New uploads stay private until review clears. Automated checks and human review are backed by reports, takedowns, and hash blocking.",
   },
   {
     key: "scope",
     lead: "One provider, not a filter.",
     body: "Forge Images moderates what it hosts. Clients keep their own list of upload providers, so no single host decides what the network can see.",
+  },
+];
+
+const services = [
+  {
+    id: "images",
+    name: "Forge Images",
+    domain: "images.bitsocialforge.com",
+    description:
+      "Free image and video hosting. Upload anonymously and get a link to share anywhere, with no expiry.",
+  },
+  {
+    id: "5archive",
+    name: "5archive",
+    domain: "5archive.org",
+    description:
+      "Search and browse archived 5chan threads. A read-only home for discussions after they leave the live boards.",
+  },
+  {
+    id: "seeditarchive",
+    name: "Seedit Archive",
+    domain: "seeditarchive.org",
+    description:
+      "Search and revisit posts from public Seedit communities, preserved beyond the live community pages.",
   },
 ];
 
@@ -208,14 +232,52 @@ function Hero() {
         communities are cryptographic property.
       </p>
       <div className="cta">
-        <a className="btn primary" href="#forge-rpc">
-          Forge RPC ↓
+        <a className="btn primary" href="#services">
+          Explore our services
         </a>
         <a className="btn ghost" href="https://x.com/bitsocialforge" rel="noopener">
           Follow @bitsocialforge
         </a>
       </div>
-      <TerminalDemo />
+    </section>
+  );
+}
+
+function Services() {
+  return (
+    <section id="services" aria-labelledby="services-heading">
+      <hr className="heat-rule" />
+      <div className="sec-head">
+        <h2 id="services-heading">Our services</h2>
+      </div>
+      <p className="sec-intro">
+        Media hosting, search, and archives. Built and operated by Bitsocial Forge for the open
+        network.
+      </p>
+      <ul className="service-list" role="list">
+        {services.map((service) => (
+          <li key={service.id}>
+            <a
+              className="service-link"
+              href={`https://${service.domain}`}
+              aria-labelledby={`${service.id}-name`}
+              aria-describedby={`${service.id}-summary`}
+            >
+              <div className="service-identity">
+                <h3 id={`${service.id}-name`}>{service.name}</h3>
+                <span className="service-domain">{service.domain}</span>
+              </div>
+              <p id={`${service.id}-summary`}>{service.description}</p>
+              <span className="service-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className="service-next">
+        In development: <a href="#forge-rpc">Forge RPC</a>, hosted nodes for your communities.
+      </p>
     </section>
   );
 }
@@ -278,6 +340,7 @@ function ForgeRpc() {
         </a>{" "}
         for updates.
       </p>
+      <TerminalDemo />
     </section>
   );
 }
@@ -288,13 +351,16 @@ function ForgeImages() {
       <hr className="heat-rule" />
       <div className="sec-head">
         <h2>Forge Images</h2>
-        <span className="badge">In development</span>
       </div>
       <p className="sec-intro">
-        <strong>Free media hosting for the open social web.</strong> A Catbox-like host for images,
-        GIFs, and video uploaded from Bitsocial clients. Its first job is the upload button in
-        5chan&apos;s web post form: pick a file and the media URL lands in your post, with no
-        separate uploader tab.
+        <strong>Free media hosting for the open social web.</strong> Upload images, GIFs, and video
+        directly on Forge Images, or from the upload button in 5chan. Get a link you can post
+        anywhere, with no account required.
+      </p>
+      <p className="images-action">
+        <a className="btn primary" href="https://images.bitsocialforge.com">
+          Open Forge Images <span aria-hidden="true">↗</span>
+        </a>
       </p>
 
       <dl className="sheet">
@@ -307,11 +373,6 @@ function ForgeImages() {
           </div>
         ))}
       </dl>
-
-      <p className="rpc-note">
-        Public uploads open only after legal, abuse-response, moderation, security, and
-        infrastructure launch gates are complete.
-      </p>
     </section>
   );
 }
@@ -345,7 +406,10 @@ function ForgeRole() {
         </div>
         <div className="split-side">
           <h3>Bitsocial Forge Inc.</h3>
-          <p>The company. It runs services on the protocol: Forge RPC and Forge Images.</p>
+          <p>
+            The company. It builds and runs services on the protocol: Forge Images, 5archive, Seedit
+            Archive, and the upcoming Forge RPC.
+          </p>
           <a href="https://github.com/bitsocialforge" rel="noopener">
             github.com/bitsocialforge
           </a>
@@ -391,6 +455,7 @@ function SiteFooter() {
           <span>© 2026 Bitsocial Forge Inc.</span>
         </div>
         <nav className="foot-links" aria-label="Footer">
+          <a href="#services">Our services</a>
           <a href="https://bitsocial.net" rel="noopener">
             bitsocial.net
           </a>
@@ -422,8 +487,9 @@ export function App() {
       <div className="wrap">
         <main>
           <Hero />
-          <ForgeRpc />
+          <Services />
           <ForgeImages />
+          <ForgeRpc />
           <ForgeRole />
         </main>
       </div>
