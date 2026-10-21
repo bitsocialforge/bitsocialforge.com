@@ -1,3 +1,5 @@
+import type { ChildProcess } from 'node:child_process';
+import type { IncomingMessage } from 'node:http';
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -26,7 +28,7 @@ export function getLocalServerCommand() {
   return usePortless && existsSync(portlessBin) ? portlessBin : viteBin;
 }
 
-export function sanitizeLabel(value) {
+export function sanitizeLabel(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -57,7 +59,7 @@ export function getActivePortlessRouteHosts() {
   });
 
   if (result.status !== 0) {
-    return new Set();
+    return new Set<string>();
   }
 
   const matches = result.stdout.match(/https?:\/\/[a-z0-9.-]+\.localhost(?::\d+)?/g) || [];
@@ -65,11 +67,11 @@ export function getActivePortlessRouteHosts() {
   return new Set(matches.map((url) => new URL(url).hostname));
 }
 
-export function isRouteBusy(activeRouteHosts, appName) {
+export function isRouteBusy(activeRouteHosts: Set<string>, appName: string) {
   return activeRouteHosts.has(`${appName}.localhost`);
 }
 
-export function getPreferredPortlessAppName(activeRouteHosts) {
+export function getPreferredPortlessAppName(activeRouteHosts: Set<string>) {
   const branch = getCurrentBranch();
   const branchLabel = sanitizeLabel(branch || "current");
 
@@ -115,14 +117,14 @@ export function ensurePortlessProxy() {
   }
 }
 
-export async function waitForUrlReady(url, timeoutMs) {
+export async function waitForUrlReady(url: string, timeoutMs: number) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
     const ready = await new Promise((resolve) => {
       const parsedUrl = new URL(url);
       const getUrl = parsedUrl.protocol === "https:" ? httpsGet : httpGet;
-      const onResponse = (response) => {
+      const onResponse = (response: IncomingMessage) => {
         response.resume();
         const statusCode = response.statusCode ?? 500;
         resolve(statusCode >= 200 && statusCode < 400);
@@ -146,7 +148,7 @@ export async function waitForUrlReady(url, timeoutMs) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-export function openInBrowser(url) {
+export function openInBrowser(url: string) {
   const opener =
     process.platform === "darwin"
       ? { cmd: "open", args: [url] }
@@ -157,7 +159,7 @@ export function openInBrowser(url) {
   spawn(opener.cmd, opener.args, { stdio: "ignore", detached: true }).unref();
 }
 
-export function forwardChildExit(child) {
+export function forwardChildExit(child: ChildProcess) {
   child.on("exit", (code, signal) => {
     if (signal) {
       process.kill(process.pid, signal);

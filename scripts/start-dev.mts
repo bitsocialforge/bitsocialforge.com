@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { resolvePort } from "./dev-server-utils.mjs";
+import { resolvePort } from "./dev-server-utils.mts";
 import {
   ensurePortlessProxy,
   fallbackHost,
@@ -11,14 +11,14 @@ import {
   portlessBin,
   portlessEnv,
   waitForUrlReady,
-} from "./local-server-utils.mjs";
+} from "./local-server-utils.mts";
 
 const fallbackRequestedPort = Number(process.env.PORT) || 4173;
 const portlessBaseName = "bitsocialforge";
 
 const command = getLocalServerCommand();
-let args;
-let publicUrl = null;
+let args: string[];
+let publicUrl: string | null = null;
 
 if (command === portlessBin) {
   ensurePortlessProxy();
@@ -43,7 +43,9 @@ if (command === portlessBin) {
   }
 
   if (port !== fallbackRequestedPort) {
-    console.log(`Preferred port ${fallbackRequestedPort} is busy, so this run will use ${fallbackUrl}.`);
+    console.log(
+      `Preferred port ${fallbackRequestedPort} is busy, so this run will use ${fallbackUrl}.`,
+    );
   }
 }
 
@@ -52,11 +54,12 @@ const child = spawn(command, args, {
   env: command === portlessBin ? portlessEnv : process.env,
 });
 
-if (publicUrl && process.env.BROWSER !== "none") {
-  waitForUrlReady(publicUrl, 30_000)
+const readyUrl = publicUrl;
+if (readyUrl && process.env.BROWSER !== "none") {
+  waitForUrlReady(readyUrl, 30_000)
     .then(() => {
       console.log(`Opening ${publicUrl} in browser...`);
-      openInBrowser(publicUrl);
+      openInBrowser(readyUrl);
     })
     .catch((error) => {
       console.warn(`Could not auto-open ${publicUrl}: ${error.message}`);

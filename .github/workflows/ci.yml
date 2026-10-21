@@ -1,11 +1,13 @@
 name: CI
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [master]
 
 concurrency:
-  group: master-ci
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,5 +31,5 @@ jobs:
         run: corepack yarn build
       - name: Check AI workflow generation
         run: corepack yarn ai-workflow:check
-      - name: Test AI workflow fixtures
-        run: corepack yarn ai-workflow:test
+      - name: Test maintained TypeScript scripts
+        run: corepack yarn test:scripts

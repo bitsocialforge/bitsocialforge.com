@@ -3,16 +3,19 @@
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
-import { createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mjs";
-import { runBrowserPlan, validatePlan } from "./browser-plan.mjs";
-import { createJevClient } from "./client.mjs";
+import type { Execute } from "./browser-playwright.mts";
+import type { BrowserClient } from "./browser-plan.mts";
+import type { JevClient } from "./client.mts";
+import { createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
+import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
+import { createJevClient } from "./client.mts";
 
 const execute = promisify(execFile);
-export async function readBenchmarkPlan(file) {
+export async function readBenchmarkPlan(file: string): Promise<unknown> {
   const handle = await fs.open(
     file,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
@@ -28,22 +31,26 @@ export async function readBenchmarkPlan(file) {
     await handle.close();
   }
 }
-const median = (values) => {
+const median = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length
     ? sorted.length % 2
-      ? sorted[middle]
-      : (sorted[middle - 1] + sorted[middle]) / 2
+      ? sorted[middle]!
+      : (sorted[middle - 1]! + sorted[middle]!) / 2
     : null;
 };
 
-export function summarizePairs(runs) {
-  const pairs = new Map();
+export interface BenchmarkPairRun {
+ case: string; sample: number; mode: string; transport: 'old' | 'combined'; warmup?: boolean;
+ status: string; actions: string[]; assertions: boolean[]; lifecycleMs: number; controlCalls: number; adapterMode: string;
+}
+export function summarizePairs(runs: BenchmarkPairRun[]) {
+  const pairs = new Map<string, Partial<Record<'old' | 'combined', BenchmarkPairRun>>>();
   for (const run of runs.filter((run) => !run.warmup)) {
     const id = JSON.stringify([run.case, run.sample, run.mode]);
     if (!pairs.has(id)) pairs.set(id, {});
-    pairs.get(id)[run.transport] = run;
+    pairs.get(id)![run.transport] = run;
   }
   const summaries = [];
   for (const mode of ["deterministic", "jev"]) {
@@ -51,11 +58,10 @@ export function summarizePairs(runs) {
       (pair) => (pair.old || pair.combined)?.mode === mode,
     );
     const comparable = selected.filter(
-      ({ old, combined }) =>
-        old?.status === "completed" &&
+      (pair): pair is { old: BenchmarkPairRun; combined: BenchmarkPairRun } => { const { old, combined } = pair; return old?.status === "completed" &&
         combined?.status === "completed" &&
         JSON.stringify(old.actions) === JSON.stringify(combined.actions) &&
-        JSON.stringify(old.assertions) === JSON.stringify(combined.assertions),
+        JSON.stringify(old.assertions) === JSON.stringify(combined.assertions); },
     );
     if (!selected.length) continue;
     summaries.push({
@@ -77,17 +83,19 @@ export function summarizePairs(runs) {
   return summaries;
 }
 
-export async function benchmarkRun(plan, { createDriver, runPlan, client, baseline }) {
+export async function benchmarkRun(plan: unknown, { createDriver, runPlan, client, baseline }: {
+ createDriver: typeof createPlaywrightDriver; runPlan: typeof runBrowserPlan; client?: JevClient; baseline: boolean
+}) {
   let controlCalls = 0;
   let controlMs = 0;
   let modelMs = 0;
-  const components = {};
+  const components: Record<string, { calls: number; elapsedMs: number }> = {};
   const before = client?.stats();
   const usage = () => {
     if (!client) return null;
     const after = client.stats();
     const difference = Object.fromEntries(
-      [
+      ([
         "requests",
         "inputTokens",
         "outputTokens",
@@ -95,7 +103,7 @@ export async function benchmarkRun(plan, { createDriver, runPlan, client, baseli
         "reservedInputTokens",
         "knownCostSubtotalUsd",
         "reservedMaxCostUsd",
-      ].map((key) => [key, after[key] - before[key]]),
+      ] as const).map((key) => [key, after[key] - (before?.[key] ?? 0)]),
     );
     return {
       ...difference,
@@ -103,11 +111,11 @@ export async function benchmarkRun(plan, { createDriver, runPlan, client, baseli
     };
   };
   const raw = createDriver({
-    execute: async (...args) => {
+    execute: async (...args: Parameters<Execute>) => {
       const started = performance.now();
       controlCalls++;
       try {
-        return await execute(...args);
+        return await execute(args[0], args[1], { ...args[2], encoding: 'utf8' });
       } finally {
         controlMs += performance.now() - started;
       }
@@ -115,12 +123,13 @@ export async function benchmarkRun(plan, { createDriver, runPlan, client, baseli
   });
   const driver = new Proxy(raw, {
     get(target, key) {
-      if (typeof target[key] !== "function") return target[key];
-      return async (...args) => {
-        const phase = key === "observe" && args[0] ? "observeWithAssertions" : key;
+      const method: unknown = Reflect.get(target, key);
+      if (typeof method !== 'function') return method;
+      return async (...args: unknown[]) => {
+        const phase = key === "observe" && args[0] ? "observeWithAssertions" : String(key);
         const started = performance.now();
         try {
-          return await target[key](...args);
+          return await Reflect.apply(method, target, args);
         } finally {
           components[phase] ||= { calls: 0, elapsedMs: 0 };
           components[phase].calls++;
@@ -129,7 +138,7 @@ export async function benchmarkRun(plan, { createDriver, runPlan, client, baseli
       };
     },
   });
-  const measuredClient = client && {
+  const measuredClient: BrowserClient | undefined = client && {
     stats: usage,
     ask: async (request) => {
       const started = performance.now();
@@ -177,7 +186,7 @@ export async function main(argv = process.argv.slice(2)) {
   });
   if (values.help) {
     console.log(
-      "Usage: node scripts/jev/browser-benchmark.mjs --plan task-plan.json [--plan another.json] --baseline-root /retained/repo [--live] [--jev] [--samples 3 --warmups 1] [--evidence fixture|real-app] [--max-requests 100 --max-cost-usd 0.02]\nOffline validates plans only. --live runs real isolated browsers; --jev additionally makes budgeted model requests. Baseline root must be trusted local code retaining scripts/jev and scripts/pw-session.sh. No server starts or dependency installs. JSON goes to stdout, progress to stderr.",
+      "Usage: node --experimental-strip-types scripts/jev/browser-benchmark.mts --plan task-plan.json [--plan another.json] --baseline-root /retained/repo [--live] [--jev] [--samples 3 --warmups 1] [--evidence fixture|real-app] [--max-requests 100 --max-cost-usd 0.02]\nOffline validates plans only. --live runs real isolated browsers; --jev additionally makes budgeted model requests. Baseline root must be trusted local code retaining scripts/jev and scripts/pw-session.sh. No server starts or dependency installs. JSON goes to stdout, progress to stderr.",
     );
     return 0;
   }
@@ -202,7 +211,7 @@ export async function main(argv = process.argv.slice(2)) {
     !Number.isFinite(maxCostUsd) ||
     maxCostUsd <= 0 ||
     maxCostUsd > 0.02 ||
-    !["fixture", "real-app"].includes(values.evidence)
+    !["fixture", "real-app"].includes(values.evidence ?? "")
   )
     throw new Error("invalid_benchmark_options");
   const plans = [];
@@ -222,12 +231,16 @@ export async function main(argv = process.argv.slice(2)) {
     return 0;
   }
   const baselineRoot = path.resolve(values["baseline-root"]);
-  const oldDriver = await import(
-    pathToFileURL(path.join(baselineRoot, "scripts/jev/browser-playwright.mjs")).href
-  );
-  const oldPlan = await import(
-    pathToFileURL(path.join(baselineRoot, "scripts/jev/browser-plan.mjs")).href
-  );
+  const loadBaseline = async (name: string): Promise<Record<string, unknown>> => {
+    const typescript = path.join(baselineRoot, `scripts/jev/${name}.mts`);
+    const source = await fs.access(typescript).then(() => typescript, () => path.join(baselineRoot, `scripts/jev/${name}.mjs`));
+    const module: unknown = await import(pathToFileURL(source).href);
+    if (!module || typeof module !== 'object') throw new Error('invalid_baseline_module');
+    return module as Record<string, unknown>;
+  };
+  const oldDriver = await loadBaseline('browser-playwright');
+  const oldPlan = await loadBaseline('browser-plan');
+  if (typeof oldDriver.createPlaywrightDriver !== 'function' || typeof oldPlan.runBrowserPlan !== 'function') throw new Error('invalid_baseline_module');
   const cli = await findPlaywrightCli();
   process.env.PLAYWRIGHT_CLI_BIN = cli;
   const client = values.jev
@@ -241,13 +254,13 @@ export async function main(argv = process.argv.slice(2)) {
     : undefined;
   const model = client?.assertReady().model ?? null;
   const variants = {
-    old: { createDriver: oldDriver.createPlaywrightDriver, runPlan: oldPlan.runBrowserPlan },
+    old: { createDriver: oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver, runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
     combined: { createDriver: createPlaywrightDriver, runPlan: runBrowserPlan },
   };
   const runs = [];
   for (const entry of plans)
     for (let sample = -warmups; sample < samples; sample++) {
-      const order = (sample + warmups) % 2 ? ["combined", "old"] : ["old", "combined"];
+      const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
       for (const transport of order) {
         const result = await benchmarkRun(entry.plan, {
           ...variants[transport],

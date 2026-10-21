@@ -65,7 +65,7 @@ function findProjectRoot(startDir = process.cwd()) {
  */
 function findHarnessDirs(projectRoot) {
   const canonical = join(projectRoot, '.agents', 'skills');
-  if (existsSync(join(projectRoot, 'scripts', 'sync-ai-workflow.mjs')) && existsSync(join(canonical, 'impeccable'))) return [canonical];
+  if ((existsSync(join(projectRoot, 'scripts', 'sync-ai-workflow.mts')) || existsSync(join(projectRoot, 'scripts', 'sync-ai-workflow.mjs'))) && existsSync(join(canonical, 'impeccable'))) return [canonical];
   const dirs = [];
   for (const harness of HARNESS_DIRS) {
     const skillsDir = join(projectRoot, harness, 'skills');

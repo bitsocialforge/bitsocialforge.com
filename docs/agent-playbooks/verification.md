@@ -11,7 +11,7 @@ Select checks from the affected behavior and preserve explicit user, CI, and dep
 | Shared app, runtime dependencies, build/deployment config | `yarn agent:verify`, plus affected browser behavior |
 | Package manifest | `corepack yarn install` and synchronized lockfile; distinguish tooling-only dev dependencies from app/runtime/build changes |
 
-`yarn agent:verify` explicitly runs type checking, lint, build, local HTML/CSS asset checks, HTML shell structure checks, and verifies that public assets reached `dist`. It does not install dependencies, start a server, mutate Git, or run on stop. It needs the repository’s installed toolchain and `/usr/bin/python3` for the retained HTML/CSS checks.
+`yarn agent:verify` explicitly runs type checking, maintained script tests, lint, build, local HTML/CSS asset checks, HTML shell structure checks, and verifies that public assets reached `dist`. It does not install dependencies, start a server, mutate Git, or run on stop. It needs the repository’s installed toolchain and `/usr/bin/python3` for the retained HTML/CSS checks.
 
 For UI changes, use an isolated named Playwright session. Verify relevant interactions, console errors, failed local requests, keyboard/accessibility behavior, and responsive layout. Small localized changes can use Chromium; shared CSS, responsive layout, browser-sensitive APIs, broad interactions, and release verification use Chromium, Firefox, and WebKit sequentially. Use each engine for desktop and mobile before closing it. Stop only the exact session/server created by the task; never use global browser cleanup.
 

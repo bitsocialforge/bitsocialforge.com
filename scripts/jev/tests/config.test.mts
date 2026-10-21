@@ -1,13 +1,13 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { resolveJevSettings, redactJevSecrets } from "../config.mjs";
+import { resolveJevSettings, redactJevSecrets, JevConfigError } from "../config.mts";
 
-function fixture(t) {
+function fixture(t: TestContext) {
   const home = mkdtempSync(path.join(tmpdir(), "jev-config-"));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const directory = path.join(home, ".config", "bitsocial");
@@ -18,8 +18,8 @@ function fixture(t) {
   writeFileSync(configFile, JSON.stringify({ apiKeyFile: keyFile, model: "jev-1.13.0" }));
   return { home, keyFile, configFile };
 }
-function cleanEnv(home) {
-  const env = { ...process.env, XDG_CONFIG_HOME: path.join(home, ".config") };
+function cleanEnv(home: string) {
+  const env: NodeJS.ProcessEnv = { ...process.env, XDG_CONFIG_HOME: path.join(home, ".config") };
   for (const key of ["TYPESAFE_API_KEY", "TYPESAFE_API_KEY_FILE", "JEV_MODEL", "JEV_CONFIG_FILE"])
     delete env[key];
   return env;
@@ -68,13 +68,13 @@ test("explicit options then environment override local defaults; complete overri
 test("explicit null settings are invalid and never select private defaults", (t) => {
   const { home } = fixture(t);
   for (const options of [{ apiKey: null }, { model: null }, { apiKey: null, model: null }]) {
-    assert.throws(() => resolveJevSettings({ env: {}, home, ...options }));
+    assert.throws(() => Reflect.apply(resolveJevSettings, undefined, [{ env: {}, home, ...options }]));
     assert.throws(() =>
-      resolveJevSettings({
+      Reflect.apply(resolveJevSettings, undefined, [{
         env: { TYPESAFE_API_KEY: "environment-key", JEV_MODEL: "jev-1.13.0" },
         home,
         ...options,
-      }),
+      }]),
     );
   }
 });
@@ -107,7 +107,7 @@ test("malformed, oversized, unreadable and unpinned config errors disclose no co
     assert.throws(
       () => resolveJevSettings({ env: {}, home }),
       (error) =>
-        !error.message.includes("private-content") &&
+        error instanceof JevConfigError && !error.message.includes("private-content") &&
         ["invalid_config", "config_unreadable"].includes(error.code),
     );
   }
@@ -141,8 +141,8 @@ test("malformed, oversized, unreadable and unpinned config errors disclose no co
 test("CLI check is safe; a live client uses file credentials and fixed model without exporting secrets", (t) => {
   const { home, keyFile } = fixture(t);
   const env = cleanEnv(home);
-  const configPath = fileURLToPath(new URL("../config.mjs", import.meta.url));
-  const check = spawnSync(process.execPath, [configPath, "--check"], {
+  const configPath = fileURLToPath(new URL("../config.mts", import.meta.url));
+  const check = spawnSync(process.execPath, ["--experimental-strip-types", configPath, "--check"], {
     env,
     cwd: tmpdir(),
     encoding: "utf8",
@@ -150,10 +150,11 @@ test("CLI check is safe; a live client uses file credentials and fixed model wit
   assert.equal(check.status, 0, check.stderr);
   assert.deepEqual(JSON.parse(check.stdout), { ready: true, model: "jev-1.13.0", networkCalls: 0 });
   assert.equal(check.stdout.includes("file-fixture-key"), false);
-  const clientUrl = pathToFileURL(fileURLToPath(new URL("../client.mjs", import.meta.url))).href;
+  const clientUrl = pathToFileURL(fileURLToPath(new URL("../client.mts", import.meta.url))).href;
   const run = spawnSync(
     process.execPath,
     [
+      "--experimental-strip-types",
       "--input-type=module",
       "-e",
       `
@@ -183,10 +184,11 @@ test("import and offline client never read invalid machine configuration", (t) =
   const { home, configFile } = fixture(t);
   writeFileSync(configFile, "{invalid");
   const env = cleanEnv(home);
-  const url = new URL("../client.mjs", import.meta.url).href;
+  const url = new URL("../client.mts", import.meta.url).href;
   const result = spawnSync(
     process.execPath,
     [
+      "--experimental-strip-types",
       "--input-type=module",
       "-e",
       `

@@ -1,7 +1,7 @@
 import net from "node:net";
 
-function checkPort(port) {
-  return new Promise((resolve) => {
+function checkPort(port: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     const server = net.createServer();
 
     server.once("error", () => resolve(false));
@@ -12,7 +12,7 @@ function checkPort(port) {
   });
 }
 
-export async function resolvePort(requestedPort) {
+export async function resolvePort(requestedPort: number) {
   let port = requestedPort;
 
   while (!(await checkPort(port))) {

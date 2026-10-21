@@ -12,8 +12,9 @@ import {
   reviewPatches,
   reviewMetrics,
   collectReviewDiff,
-} from "../review.mjs";
-import { createJevClient, JevError } from "../client.mjs";
+} from "../review.mts";
+import { createJevClient, JevError } from "../client.mts";
+import { jsonBody, required, record } from "./helpers.mts";
 const exec = promisify(execFile);
 const rules = validateReviewRules(
   JSON.parse(await fs.readFile(new URL("../review-rules.json", import.meta.url), "utf8")),
@@ -37,13 +38,13 @@ const answer = (choice = "clear", probability = 0.99) => ({
   confidence: probability,
   type: "choice",
 });
-const client = (choice = "clear", probability = 0.99, inspect = () => {}) =>
+const client = (choice = "clear", probability = 0.99, inspect: (body: Record<string, unknown>) => void = () => {}) =>
   createJevClient({
     live: true,
     apiKey: "fixture-review-key",
     model,
     fetchImpl: async (_, request) => {
-      inspect(JSON.parse(request.body));
+      inspect(jsonBody(request));
       return Response.json({
         model,
         answers: { state_truth: answer(choice, probability) },
@@ -63,9 +64,18 @@ test("offline validation never touches credentials or a client", async () => {
       },
     },
   });
-  assert.equal(result.items[0].status, "unverified");
-  assert.equal(result.items[0].code, "offline");
-  assert.equal(result.usage.requests, 0);
+  assert.equal(required(result.items[0]).status, "unverified");
+  assert.equal(required(result.items[0]).code, "offline");
+  assert.equal(record(result.usage).requests, 0);
+});
+test("default rules cover migrated TypeScript scripts", async () => {
+  const result = await reviewPatches(
+    [{ id: "script", path: "scripts/task.mts", diff: '+ status("Done")' }],
+    rules,
+  );
+  const reviewed = required(result.items[0]);
+  assert.equal(reviewed.code, "offline");
+  assert.deepEqual(reviewed.checks.map(({ rule }) => rule), rules.map(({ id }) => id));
 });
 test("only patch and explicit context are sent; labels and identity stay local", async () => {
   const result = await reviewPatches([item], rules, {
@@ -76,7 +86,7 @@ test("only patch and explicit context are sent; labels and identity stay local",
       assert.ok(!JSON.stringify(body).includes(item.path));
     }),
   });
-  assert.equal(result.items[0].status, "issue");
+  assert.equal(required(result.items[0]).status, "issue");
   assert.equal(result.advisory, true);
   assert.ok(!JSON.stringify(result).includes(item.diff));
 });
@@ -85,10 +95,9 @@ test("uncertainty, low probability, provider errors and budgets stay unverified"
     ["uncertain", 0.99],
     ["clear", 0.6],
     ["issue", 0.6],
-  ])
+  ] as const)
     assert.equal(
-      (await reviewPatches([item], rules, { live: true, client: client(choice, p) })).items[0]
-        .status,
+      required((await reviewPatches([item], rules, { live: true, client: client(choice, p) })).items[0]).status,
       "unverified",
     );
   const result = await reviewPatches([item], rules, {
@@ -102,8 +111,8 @@ test("uncertainty, low probability, provider errors and budgets stay unverified"
       },
     },
   });
-  assert.equal(result.items[0].code, "budget_exhausted");
-  assert.equal(result.usage.estimatedCostUsd, null);
+  assert.equal(required(result.items[0]).code, "budget_exhausted");
+  assert.equal(record(result.usage).estimatedCostUsd, null);
 });
 test("common credential patterns and exact provider key are never sent", async () => {
   for (const text of [
@@ -117,15 +126,15 @@ test("common credential patterns and exact provider key are never sent", async (
       live: true,
       client: client(),
     });
-    assert.equal(result.items[0].code, "possible_secret");
-    assert.equal(result.usage.requests, 0);
+    assert.equal(required(result.items[0]).code, "possible_secret");
+    assert.equal(record(result.usage).requests, 0);
   }
   const result = await reviewPatches([{ ...item, diff: "fixture-review-key" }], rules, {
     live: true,
     client: client(),
   });
-  assert.equal(result.items[0].code, "secret_in_input");
-  assert.equal(result.usage.requests, 0);
+  assert.equal(required(result.items[0]).code, "secret_in_input");
+  assert.equal(record(result.usage).requests, 0);
 });
 test("invalid and ambiguous scopes fail rather than silently widening", () => {
   for (const bad of [
@@ -145,8 +154,8 @@ test("invalid and ambiguous scopes fail rather than silently widening", () => {
 test("metrics retain unavailable positive cases in recall and never count clear as accuracy", () => {
   const labels = [item, { ...item, id: "good", expected: { state_truth: "clear" } }];
   const metrics = reviewMetrics(labels, [
-    { id: "example", checks: [] },
-    { id: "good", checks: [{ rule: "state_truth", status: "issue" }] },
+    { id: "example", status: "unverified", checks: [] },
+    { id: "good", status: "issue", checks: [{ rule: "state_truth", status: "issue" }] },
   ]);
   assert.equal(metrics.recall, 0);
   assert.equal(metrics.precision, 0);
@@ -156,13 +165,13 @@ test("metrics retain unavailable positive cases in recall and never count clear 
 test("definite judgments on intentionally insufficient evidence count as errors", () => {
   const labels = [{ ...item, expected: { state_truth: "uncertain" } }];
   const flagged = reviewMetrics(labels, [
-    { id: item.id, checks: [{ rule: "state_truth", status: "issue" }] },
+    { id: item.id, status: "issue", checks: [{ rule: "state_truth", status: "issue" }] },
   ]);
   assert.equal(flagged.falseFlags, 1);
   assert.equal(flagged.unsupportedFlags, 1);
   assert.equal(flagged.precision, 0);
   const cleared = reviewMetrics(labels, [
-    { id: item.id, checks: [{ rule: "state_truth", status: "clear" }] },
+    { id: item.id, status: "clear", checks: [{ rule: "state_truth", status: "clear" }] },
   ]);
   assert.equal(cleared.falseClears, 1);
   assert.equal(cleared.unsupportedClears, 1);
@@ -190,7 +199,7 @@ test("Git scope is explicit, argument-safe and refuses symlinks/untracked files"
     );
     await fs.writeFile(path.join(cwd, "a.ts"), "const a=2;\n");
     const input = await collectReviewDiff("HEAD", ["a.ts"], { cwd });
-    assert.match(input.items[0].diff, /const a=2/);
+    assert.match(required(input.items[0]).diff, /const a=2/);
     await assert.rejects(collectReviewDiff("--output=bad", ["a.ts"], { cwd }));
     await assert.rejects(collectReviewDiff("HEAD", [], { cwd }));
     await fs.writeFile(path.join(cwd, "untracked.ts"), "x");
@@ -207,7 +216,7 @@ test("Git scope is explicit, argument-safe and refuses symlinks/untracked files"
 });
 test("fixture labels validate and are explicitly synthetic", async () => {
   const input = await readReviewJson(new URL("../fixtures/review.json", import.meta.url));
-  assert.equal(input.provenance, "synthetic");
+  assert.equal(record(input).provenance, "synthetic");
   assert.equal(validateReviewInput(input, rules).length, 12);
 });
 
@@ -238,9 +247,9 @@ test("Git filenames with pathspec metacharacters do not widen the selection", as
     await fs.writeFile(path.join(cwd, "src/x.ts"), "const OUT_OF_SCOPE = 3;\n");
     const input = await collectReviewDiff("HEAD", ["src/[x].ts"], { cwd });
     assert.equal(input.items.length, 1);
-    assert.match(input.items[0].diff, /value = 2/);
-    assert.ok(!input.items[0].diff.includes("OUT_OF_SCOPE"));
-    assert.equal((input.items[0].diff.match(/diff --git/g) || []).length, 1);
+    assert.match(required(input.items[0]).diff, /value = 2/);
+    assert.ok(!required(input.items[0]).diff.includes("OUT_OF_SCOPE"));
+    assert.equal((required(input.items[0]).diff.match(/diff --git/g) || []).length, 1);
   } finally {
     await fs.rm(cwd, { recursive: true, force: true });
   }

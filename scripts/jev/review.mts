@@ -2,23 +2,33 @@
 // Optional development-only semantic review. No hooks, edits, or approval authority.
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
+import type { PathLike } from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { createJevClient, JevError } from "./client.mjs";
+import type { ChoiceQuestion } from "./client.mts";
+import type { BrowserClient } from "./browser-plan.mts";
+import type { Execute } from "./browser-playwright.mts";
+import { createJevClient, JevError } from "./client.mts";
+
+
+export interface ReviewRule { id: string; criterion: string; extensions: string[] }
+export interface ReviewItem { id: string; path: string; diff: string; context?: string; rules?: string[]; expected?: Record<string, string> }
+export interface ReviewCheck { rule: string; status: string; choice?: string; probability?: number }
+export interface ReviewResult { id: string; status: string; code?: string; checks: ReviewCheck[]; latencyMs?: number }
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const object = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
-const fail = (code) => {
+const object = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === "object" && !Array.isArray(x);
+function fail(code: string): never {
   throw new JevError(code);
 };
-const identifier = (x) => typeof x === "string" && /^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(x);
-const keysOnly = (value, keys) =>
+const identifier = (x: unknown): x is string => typeof x === "string" && /^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(x);
+const keysOnly = (value: unknown, keys: string[]): value is Record<string, unknown> =>
   object(value) && Object.keys(value).every((key) => keys.includes(key));
-const safePath = (value) =>
+const safePath = (value: unknown): value is string =>
   typeof value === "string" &&
   value.length <= 500 &&
   !path.isAbsolute(value) &&
@@ -27,7 +37,7 @@ const safePath = (value) =>
   /\.(?:[cm]?[jt]sx?|json|mdx?|html|css)$/.test(value) &&
   !/(?:^|\/)(?:\.env|secrets?|credentials?|vault)(?:[./]|$)/i.test(value);
 
-export async function readReviewJson(file) {
+export async function readReviewJson(file: PathLike): Promise<unknown> {
   const handle = await fs.open(
     file,
     constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW,
@@ -44,7 +54,7 @@ export async function readReviewJson(file) {
   }
 }
 
-export function validateReviewRules(input) {
+export function validateReviewRules(input: unknown): ReviewRule[] {
   if (
     !keysOnly(input, ["version", "rules"]) ||
     input.version !== 1 ||
@@ -72,6 +82,7 @@ export function validateReviewRules(input) {
             ".js",
             ".jsx",
             ".mjs",
+            ".mts",
             ".cjs",
             ".json",
             ".md",
@@ -84,10 +95,10 @@ export function validateReviewRules(input) {
       fail("invalid_review_rules");
     seen.add(rule.id);
   }
-  return input.rules;
+  return input.rules as ReviewRule[];
 }
 
-export function validateReviewInput(input, rules) {
+export function validateReviewInput(input: unknown, rules: ReviewRule[]): ReviewItem[] {
   if (
     !keysOnly(input, ["version", "provenance", "items"]) ||
     input.version !== 1 ||
@@ -98,7 +109,7 @@ export function validateReviewInput(input, rules) {
     fail("invalid_review_input");
   if (
     input.provenance !== undefined &&
-    !["synthetic", "human-reviewed", "unspecified"].includes(input.provenance)
+    (typeof input.provenance !== 'string' || !['synthetic', 'human-reviewed', 'unspecified'].includes(input.provenance))
   )
     fail("invalid_label_provenance");
   const seen = new Set();
@@ -131,15 +142,15 @@ export function validateReviewInput(input, rules) {
         Object.entries(item.expected).some(
           ([id, value]) =>
             !rules.some((rule) => rule.id === id) ||
-            !["clear", "issue", "uncertain"].includes(value),
+            (typeof value !== 'string' || !['clear', 'issue', 'uncertain'].includes(value)),
         ))
     )
       fail("invalid_review_labels");
   }
-  return input.items;
+  return input.items as ReviewItem[];
 }
 
-export function reviewQuestions(item, rules) {
+export function reviewQuestions(item: ReviewItem, rules: ReviewRule[]): Record<string, ChoiceQuestion> {
   return Object.fromEntries(
     rules
       .filter(
@@ -166,14 +177,14 @@ export function reviewQuestions(item, rules) {
 }
 
 export async function reviewPatches(
-  items,
-  rules,
-  { client, live = false, minProbability = 0.9 } = {},
+  items: ReviewItem[],
+  rules: ReviewRule[],
+  { client, live = false, minProbability = 0.9 }: { client?: BrowserClient; live?: boolean; minProbability?: number } = {},
 ) {
   if (!Number.isFinite(minProbability) || minProbability < 0.5 || minProbability > 1)
     fail("invalid_review_threshold");
   validateReviewInput({ version: 1, items }, rules);
-  const results = [];
+  const results: ReviewResult[] = [];
   for (const item of items) {
     const questions = reviewQuestions(item, rules);
     if (!Object.keys(questions).length) {
@@ -206,7 +217,7 @@ export async function reviewPatches(
         choice: answer.choice,
         probability: answer.probabilities[answer.choice],
         status:
-          answer.choice === "uncertain" || answer.probabilities[answer.choice] < minProbability
+          answer.choice === "uncertain" || (answer.probabilities[answer.choice] ?? 0) < minProbability
             ? "unverified"
             : answer.choice,
       }));
@@ -218,7 +229,7 @@ export async function reviewPatches(
             ? "unverified"
             : "clear",
         checks,
-        latencyMs: response.latencyMs,
+        latencyMs: 'latencyMs' in response && typeof response.latencyMs === 'number' ? response.latencyMs : undefined,
       });
     } catch (error) {
       results.push({
@@ -240,7 +251,7 @@ export async function reviewPatches(
   };
 }
 
-export function reviewMetrics(items, results) {
+export function reviewMetrics(items: ReviewItem[], results: ReviewResult[]) {
   const rows = items.flatMap((item) =>
     Object.entries(item.expected || {}).map(([rule, expected]) => ({
       id: item.id,
@@ -272,7 +283,7 @@ export function reviewMetrics(items, results) {
   };
 }
 
-export async function collectReviewDiff(base, files, { cwd = root, execute = exec } = {}) {
+export async function collectReviewDiff(base: string, files: string[], { cwd = root, execute = exec }: { cwd?: string; execute?: Execute } = {}) {
   if (
     typeof base !== "string" ||
     !base ||
@@ -283,7 +294,7 @@ export async function collectReviewDiff(base, files, { cwd = root, execute = exe
     files.some((x) => !safePath(x))
   )
     fail("invalid_diff_selection");
-  const git = async (args) =>
+  const git = async (args: string[]) =>
     (
       await execute("git", ["--literal-pathspecs", ...args], {
         cwd,
@@ -341,7 +352,7 @@ export async function main(argv = process.argv.slice(2)) {
   });
   if (values.help) {
     console.log(
-      "Usage: node scripts/jev/review.mjs (--input selected-patches.json | --base HEAD --files src/a.ts,src/b.ts) [--live] [--rules rules.json] [--model jev-X.Y.Z] [--max-requests 20 --max-cost-usd 0.02]\nAdvisory only. Offline validates scope without credentials or inference. Input JSON is {version:1,items:[{id,path,diff,context?,rules?,expected?}]}.",
+      "Usage: node --experimental-strip-types scripts/jev/review.mts (--input selected-patches.json | --base HEAD --files src/a.ts,src/b.ts) [--live] [--rules rules.json] [--model jev-X.Y.Z] [--max-requests 20 --max-cost-usd 0.02]\nAdvisory only. Offline validates scope without credentials or inference. Input JSON is {version:1,items:[{id,path,diff,context?,rules?,expected?}]}.",
     );
     return 0;
   }
@@ -351,12 +362,12 @@ export async function main(argv = process.argv.slice(2)) {
     (values.base && !values.files)
   )
     fail("explicit_review_scope_required");
-  const rules = validateReviewRules(await readReviewJson(values.rules));
+  const rules = validateReviewRules(await readReviewJson(values.rules!));
   const input = values.input
     ? await readReviewJson(values.input)
     : await collectReviewDiff(
-        values.base,
-        values.files.split(",").map((x) => x.trim()),
+        values.base!,
+        values.files!.split(",").map((x) => x.trim()),
       );
   const items = validateReviewInput(input, rules);
   const maxRequests = Number(values["max-requests"]),
@@ -382,7 +393,7 @@ export async function main(argv = process.argv.slice(2)) {
         model,
         evaluation: values.live
           ? {
-              labelProvenance: input.provenance ?? "unspecified",
+              labelProvenance: object(input) ? input.provenance ?? "unspecified" : "unspecified",
               ...reviewMetrics(items, report.items),
             }
           : null,

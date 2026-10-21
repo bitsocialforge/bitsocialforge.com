@@ -1,25 +1,57 @@
 // Development-only adapter. Never import into application code.
 import { constants, closeSync, fstatSync, lstatSync, openSync, readSync } from "node:fs";
+import type { Stats } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
 export const MODEL = "gpt-6-luna";
 export const ENDPOINT = "https://api.openai.com/v1/decisions";
 export const INPUT_USD_PER_MILLION = 0.1;
-export const CHOICES = ["satisfies", "issue", "uncertain"];
+export const CHOICES = ["satisfies", "issue", "uncertain"] as const;
+export type Choice = (typeof CHOICES)[number];
+export type Check = { id: string; criterion: string };
+export type DecisionInput = { context?: string; mime: string; bytes: Buffer; checks: Check[] };
+export type DecisionResult =
+  | { id: string; status: "unavailable"; reason: "provider_refusal" }
+  | {
+      id: string;
+      status: Choice;
+      choice: Choice;
+      confidence: number;
+      probabilities: Partial<Record<Choice, number>>;
+    };
+export type Usage = Partial<Record<"input_tokens" | "output_tokens" | "total_tokens", number>>;
+type SettingsOptions = { env?: Record<string, unknown>; home?: string };
+export type DecisionRequestInit = RequestInit & {
+  headers: Record<string, string>;
+  body: string;
+  signal: AbortSignal;
+};
+export type DecisionFetch = (
+  url: string,
+  init: DecisionRequestInit,
+) => Promise<{ redirected: boolean; ok: boolean; body?: ReadableStream<Uint8Array> | null }>;
+export type DecisionOptions = SettingsOptions & {
+  fetchImpl?: DecisionFetch;
+  timeoutMs?: number;
+  beforeRequest?: () => void;
+};
+const isChoice = (value: unknown): value is Choice =>
+  value === "satisfies" || value === "issue" || value === "uncertain";
 
 export class VisualQaError extends Error {
-  constructor(code) {
+  readonly code: string;
+  constructor(code: string) {
     super(code);
     this.code = code;
   }
 }
-export const fail = (code) => {
+export function fail(code: string): never {
   throw new VisualQaError(code);
-};
-export const isObject = (value) =>
+}
+export const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
-export const hasControl = (value, allowWhitespace = false) =>
+export const hasControl = (value: string, allowWhitespace = false) =>
   [...value].some((character) => {
     const code = character.charCodeAt(0);
     return code === 127 || (code < 32 && !(allowWhitespace && [9, 10, 13].includes(code)));
@@ -27,8 +59,12 @@ export const hasControl = (value, allowWhitespace = false) =>
 
 // Check every component, then use a non-following descriptor and stable identity.
 // The same bounded reader protects manifests, screenshots and private settings.
-export function readLocalFile(file, limit, { privateFile = false } = {}) {
-  let descriptor;
+export function readLocalFile(
+  file: unknown,
+  limit: number,
+  { privateFile = false }: { privateFile?: boolean } = {},
+): Buffer {
+  let descriptor: number | undefined;
   try {
     if (typeof file !== "string" || !path.isAbsolute(file) || hasControl(file)) fail("unsafe_path");
     const absolute = path.resolve(file);
@@ -70,24 +106,29 @@ export function readLocalFile(file, limit, { privateFile = false } = {}) {
     return bytes.subarray(0, size);
   } catch (error) {
     if (error instanceof VisualQaError) throw error;
-    fail("file_unreadable");
+    return fail("file_unreadable");
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
 }
 
-const sameFile = (left, right) =>
-  ["dev", "ino", "size", "mtimeMs", "ctimeMs"].every((key) => left[key] === right[key]);
+const sameFile = (left: Stats, right: Stats) =>
+  (["dev", "ino", "size", "mtimeMs", "ctimeMs"] as const).every((key) => left[key] === right[key]);
 
-function parseKey(raw, labelsAllowed) {
+function parseKey(raw: unknown, labelsAllowed: boolean): string {
   if (typeof raw !== "string" || Buffer.byteLength(raw) > 16_384) fail("invalid_api_key");
   const matches = raw.match(/\bsk-[A-Za-z0-9_-]{16,}\b/g) || [];
   const unique = [...new Set(matches)];
-  if (unique.length !== 1 || (!labelsAllowed && raw.trim() !== unique[0])) fail("invalid_api_key");
+  if (
+    unique.length !== 1 ||
+    unique[0] === undefined ||
+    (!labelsAllowed && raw.trim() !== unique[0])
+  )
+    fail("invalid_api_key");
   return unique[0];
 }
 
-export function resolveSettings({ env = process.env, home = homedir() } = {}) {
+export function resolveSettings({ env = process.env, home = homedir() }: SettingsOptions = {}) {
   if (env.OPENAI_API_KEY !== undefined)
     return { model: MODEL, apiKey: parseKey(env.OPENAI_API_KEY, false) };
   let keyFile = env.OPENAI_API_KEY_FILE;
@@ -101,7 +142,7 @@ export function resolveSettings({ env = process.env, home = homedir() } = {}) {
     )
       fail("invalid_config_path");
     const configFile = path.join(configDirectory, "bitsocial", "decisions.json");
-    let config;
+    let config: unknown;
     try {
       config = JSON.parse(
         readLocalFile(configFile, 16_384, { privateFile: true }).toString("utf8"),
@@ -125,7 +166,7 @@ export function resolveSettings({ env = process.env, home = homedir() } = {}) {
   };
 }
 
-export function makeRequest(input) {
+export function makeRequest(input: DecisionInput) {
   return {
     model: MODEL,
     input: [
@@ -166,9 +207,9 @@ export function makeRequest(input) {
   };
 }
 
-const probability = (value) =>
+const probability = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
-export function parseDecision(data, checks, threshold = 0.9) {
+export function parseDecision(data: unknown, checks: Pick<Check, "id">[], threshold = 0.9) {
   if (
     !isObject(data) ||
     data.model !== MODEL ||
@@ -176,23 +217,24 @@ export function parseDecision(data, checks, threshold = 0.9) {
     data.answers.length !== checks.length
   )
     fail("invalid_response");
-  const results = data.answers.map((answer, index) => {
-    if (!isObject(answer) || answer.name !== checks[index].id) fail("invalid_response");
+  const results = data.answers.map((answer: unknown, index: number): DecisionResult => {
+    if (!isObject(answer) || typeof answer.name !== "string" || answer.name !== checks[index]?.id)
+      fail("invalid_response");
     if (answer.type === "refusal")
       return { id: answer.name, status: "unavailable", reason: "provider_refusal" };
     if (
       answer.type !== "choice" ||
-      !CHOICES.includes(answer.choice) ||
+      !isChoice(answer.choice) ||
       !probability(answer.confidence) ||
       !Array.isArray(answer.probabilities) ||
       answer.probabilities.length !== CHOICES.length
     )
       fail("invalid_response");
-    const probabilities = {};
+    const probabilities: Partial<Record<Choice, number>> = {};
     for (const item of answer.probabilities) {
       if (
         !isObject(item) ||
-        !CHOICES.includes(item.value) ||
+        !isChoice(item.value) ||
         Object.hasOwn(probabilities, item.value) ||
         !probability(item.probability)
       )
@@ -200,14 +242,16 @@ export function parseDecision(data, checks, threshold = 0.9) {
       probabilities[item.value] = item.probability;
     }
     const values = Object.values(probabilities);
+    const selectedProbability = probabilities[answer.choice];
+    if (selectedProbability === undefined) fail("invalid_response");
     if (
       Math.abs(values.reduce((sum, value) => sum + value, 0) - 1) > 0.001 ||
-      probabilities[answer.choice] < Math.max(...values)
+      selectedProbability < Math.max(...values)
     )
       fail("invalid_response");
     const decisive =
       answer.confidence >= threshold &&
-      probabilities[answer.choice] >= threshold &&
+      selectedProbability >= threshold &&
       answer.choice !== "uncertain";
     return {
       id: answer.name,
@@ -217,10 +261,12 @@ export function parseDecision(data, checks, threshold = 0.9) {
       probabilities,
     };
   });
-  const usage = {};
-  for (const field of ["input_tokens", "output_tokens", "total_tokens"]) {
-    if (Number.isSafeInteger(data.usage?.[field]) && data.usage[field] >= 0)
-      usage[field] = data.usage[field];
+  const usage: Usage = {};
+  const rawUsage = isObject(data.usage) ? data.usage : {};
+  for (const field of ["input_tokens", "output_tokens", "total_tokens"] as const) {
+    const value = rawUsage[field];
+    if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0)
+      usage[field] = value;
   }
   return {
     results,
@@ -232,10 +278,13 @@ export function parseDecision(data, checks, threshold = 0.9) {
   };
 }
 
-async function readResponse(response, signal) {
+async function readResponse(
+  response: Awaited<ReturnType<DecisionFetch>>,
+  signal: AbortSignal,
+): Promise<unknown> {
   if (!response.body) fail("invalid_response");
   const reader = response.body.getReader();
-  const chunks = [];
+  const chunks: Uint8Array[] = [];
   let size = 0;
   const onAbort = () => {
     void reader.cancel().catch(() => {});
@@ -263,16 +312,22 @@ async function readResponse(response, signal) {
 }
 
 export async function evaluateDecisions(
-  input,
-  { env, home, fetchImpl = globalThis.fetch, timeoutMs = 30_000, beforeRequest = () => {} } = {},
+  input: DecisionInput,
+  {
+    env,
+    home,
+    fetchImpl = globalThis.fetch,
+    timeoutMs = 30_000,
+    beforeRequest = () => {},
+  }: DecisionOptions = {},
 ) {
   const { apiKey } = resolveSettings({ env, home });
   const body = JSON.stringify(makeRequest(input));
   if (body.includes(apiKey)) fail("secret_in_input");
   beforeRequest();
   const controller = new AbortController();
-  let timer;
-  const deadline = new Promise((_, reject) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       controller.abort();
       reject(new VisualQaError("deadline_exceeded"));

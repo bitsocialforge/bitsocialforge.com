@@ -1,3 +1,11 @@
+import type { BrowserDriver, BrowserPlan, Assertion, Observation } from "./browser-plan.mts";
+import type { ExecFileOptions } from "node:child_process";
+export type Execute = (file: string, args: string[], options: ExecFileOptions) => Promise<{ stdout: string; stderr: string }>;
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+function observationResult(value: unknown): Observation {
+  if (!record(value) || typeof value.url !== 'string' || typeof value.snapshot !== 'string' || !Array.isArray(value.assertions) || !value.assertions.every((item: unknown) => typeof item === 'boolean')) throw new JevError('browser_result_invalid');
+  return { url: value.url, snapshot: value.snapshot, assertions: value.assertions };
+}
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, readFile, writeFile, rm, chmod, access } from "node:fs/promises";
@@ -5,7 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { JevError } from "./client.mjs";
+import { JevError } from "./client.mts";
 
 const exec = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -18,7 +26,7 @@ const locatorCode = `function locate(target) {
 }`;
 
 // Shared by both transports: combining observations must not change assertion semantics.
-const assertionCode = (assertions) => `${locatorCode}
+const assertionCode = (assertions: Assertion[]) => `${locatorCode}
   const assertions = ${JSON.stringify(assertions)};
   const results = [];
   for (const assertion of assertions) {
@@ -43,9 +51,9 @@ const assertionCode = (assertions) => `${locatorCode}
 
 // Playwright CLI's run-code VM omits URL. Requests are already canonical absolute URLs;
 // use the exact origin boundary there, and evaluate location/relative URLs inside the page.
-export const canonicalNavigationAllowed = (requestUrl, origin) =>
+export const canonicalNavigationAllowed = (requestUrl: string, origin: string) =>
   requestUrl.startsWith(origin + "/");
-export const browserOriginGuard = (origin) =>
+export const browserOriginGuard = (origin: string) =>
   `if (await page.evaluate(() => location.origin) !== ${JSON.stringify(origin)}) throw new Error('origin_changed');`;
 
 export async function findPlaywrightCli() {
@@ -68,20 +76,20 @@ export async function findPlaywrightCli() {
   return "playwright-cli";
 }
 
-export function createPlaywrightDriver({ execute = exec } = {}) {
+export function createPlaywrightDriver({ execute = exec }: { execute?: Execute } = {}): BrowserDriver {
   const session = `jev-${process.pid}-${randomBytes(4).toString("hex")}`;
-  let directory,
-    cli,
-    plan,
-    started,
-    combinedObservation = false,
-    opening = false;
+  let directory: string;
+  let cli: string;
+  let plan: BrowserPlan;
+  let started: number;
+  let combinedObservation = false;
+  let opening = false;
   const childEnv = { ...process.env };
   delete childEnv.TYPESAFE_API_KEY;
   delete childEnv.TYPESAFE_API_KEY_FILE;
   delete childEnv.JEV_CONFIG_FILE;
   delete childEnv.JEV_MODEL;
-  async function command(args, wrapper = false, cleanup = false) {
+  async function command(args: string[], wrapper = false, cleanup = false) {
     const remaining = cleanup ? 15_000 : plan.limits.deadlineMs - (Date.now() - started);
     if (remaining <= 0) throw new JevError("deadline_exceeded");
     try {
@@ -99,15 +107,15 @@ export function createPlaywrightDriver({ execute = exec } = {}) {
       if (/^### Error/m.test(result.stdout)) throw new JevError("browser_command_failed");
       return result.stdout;
     } catch (error) {
-      if (error.code === 75) {
+      if (record(error) && error.code === 75) {
         opening = false;
         throw new JevError("browser_slot_busy");
       }
       if (error instanceof JevError) throw error;
-      throw new JevError(error.killed ? "browser_command_timeout" : "browser_command_failed");
+      throw new JevError(record(error) && error.killed ? "browser_command_timeout" : "browser_command_failed");
     }
   }
-  async function code(body, cleanup = false) {
+  async function code(body: string, cleanup = false): Promise<unknown> {
     const output = await command(
       [`-s=${session}`, "run-code", `async page => { ${body} }`],
       false,
@@ -116,7 +124,7 @@ export function createPlaywrightDriver({ execute = exec } = {}) {
     const match = output.match(/### Result\s*\n([\s\S]*?)(?=\n### |$)/);
     if (!match) throw new JevError("browser_result_missing");
     try {
-      return JSON.parse(match[1].trim());
+      return JSON.parse(match[1]!.trim());
     } catch {
       throw new JevError("browser_result_invalid");
     }
@@ -164,14 +172,14 @@ export function createPlaywrightDriver({ execute = exec } = {}) {
         await page.goto(${JSON.stringify(plan.url)}, {waitUntil: 'domcontentloaded'});
         return {ariaSnapshot: typeof page.ariaSnapshot === 'function'};
       `);
-      combinedObservation = capabilities?.ariaSnapshot === true;
+      combinedObservation = record(capabilities) && capabilities.ariaSnapshot === true;
     },
     async observe(assertions = []) {
       if (combinedObservation) {
-        const observation = await code(`${guard()}
+        const observation = observationResult(await code(`${guard()}
           const snapshot = await page.ariaSnapshot({mode: 'ai'});
           ${assertionCode(assertions)}
-          ${guard()} return {url: page.url(), snapshot, assertions: results};`);
+          ${guard()} return {url: page.url(), snapshot, assertions: results};`));
         // A method can exist on an older installation without supporting AI mode.
         // Default ARIA output has roles but no actionable refs. Preserve the CLI's
         // supported serialization in that case; other failures still fail closed.
@@ -190,7 +198,8 @@ export function createPlaywrightDriver({ execute = exec } = {}) {
       const result = await code(
         `${guard()} ${assertionCode(assertions)} ${guard()} return {url: page.url(), assertions: results};`,
       );
-      return { ...result, snapshot: await readFile(snapshotFile, "utf8") };
+      if (!record(result)) throw new JevError('browser_result_invalid');
+      return observationResult({ ...result, snapshot: await readFile(snapshotFile, 'utf8') });
     },
     async act(action) {
       const result = await code(`
