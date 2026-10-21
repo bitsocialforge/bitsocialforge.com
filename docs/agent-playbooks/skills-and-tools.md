@@ -12,7 +12,7 @@ Commit the shared sources and resulting native files together. The check detects
 
 ## Native discovery and generation
 
-`.agents/roles/` is a repository-specific source format consumed by `scripts/ai-workflow-files.mjs`; no app is expected to discover it. It is deliberately separate from native configuration:
+`.agents/roles/` is a repository-specific source format consumed by `scripts/ai-workflow-files.mts`; no app is expected to discover it. It is deliberately separate from native configuration:
 
 | App | Skills | Custom agents | Project instructions |
 |---|---|---|---|

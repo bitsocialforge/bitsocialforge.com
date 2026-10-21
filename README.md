@@ -25,9 +25,15 @@ Useful checks:
 
 ```bash
 corepack yarn type-check
+corepack yarn test:scripts
 corepack yarn lint
 corepack yarn build
 ```
+
+Type checking covers the application, Vite configuration, and maintained scripts/tests.
+Scripts use `.mts` and run with Node 22.12+ via `--experimental-strip-types`;
+`type-check` also rejects JavaScript added under `src/` or `scripts/`. Bundled
+third-party skills and generated build output are outside that source policy.
 
 ## Deploy
 

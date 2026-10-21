@@ -2,19 +2,19 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
-import { createJevClient, JevError } from "./client.mjs";
-import { redactJevSecrets } from "./config.mjs";
-import { validatePlan, runBrowserPlan } from "./browser-plan.mjs";
-import { createPlaywrightDriver } from "./browser-playwright.mjs";
+import { createJevClient, JevError } from "./client.mts";
+import { redactJevSecrets } from "./config.mts";
+import { validatePlan, runBrowserPlan } from "./browser-plan.mts";
+import { createPlaywrightDriver } from "./browser-playwright.mts";
 
 export async function main(args = process.argv.slice(2)) {
   if (!args.length || args.includes("--help")) {
     process.stdout.write(
-      "Usage: node scripts/jev/browser.mjs --plan plan.json [--live [--baseline]] [--model jev-X.Y.Z]\nWithout --live, validates the plan offline. --live --baseline executes the same plan without AI calls; --baseline requires --live.\nLive Jev reads the private machine config or TYPESAFE_API_KEY / TYPESAFE_API_KEY_FILE and JEV_MODEL (or --model). See scripts/jev/README.md. JSON result, exit 0 complete/valid, 2 incomplete/invalid.\n",
+      "Usage: node --experimental-strip-types scripts/jev/browser.mts --plan plan.json [--live [--baseline]] [--model jev-X.Y.Z]\nWithout --live, validates the plan offline. --live --baseline executes the same plan without AI calls; --baseline requires --live.\nLive Jev reads the private machine config or TYPESAFE_API_KEY / TYPESAFE_API_KEY_FILE and JEV_MODEL (or --model). See scripts/jev/README.md. JSON result, exit 0 complete/valid, 2 incomplete/invalid.\n",
     );
     return 0;
   }
-  const options = {};
+  const options: { '--plan'?: string; '--model'?: string; '--live'?: boolean; '--baseline'?: boolean } = {};
   const planReference = () => {
     if (!options["--plan"]) return undefined;
     const reference = redactJevSecrets(
@@ -24,15 +24,15 @@ export async function main(args = process.argv.slice(2)) {
   };
   try {
     for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (["--live", "--baseline"].includes(arg) && options[arg] === undefined) options[arg] = true;
+      const arg = args[i]!;
+      if ((arg === "--live" || arg === "--baseline") && options[arg] === undefined) options[arg] = true;
       else if (
-        ["--plan", "--model"].includes(arg) &&
+        (arg === "--plan" || arg === "--model") &&
         options[arg] === undefined &&
         args[i + 1] &&
-        !args[i + 1].startsWith("--")
+        !args[i + 1]!.startsWith("--")
       )
-        options[arg] = args[++i];
+        options[arg] = args[++i]!;
       else throw new JevError("invalid_arguments");
     }
     if (!options["--plan"]) throw new JevError("plan_required");

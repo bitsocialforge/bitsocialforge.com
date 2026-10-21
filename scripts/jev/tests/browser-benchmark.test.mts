@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { summarizePairs, main, readBenchmarkPlan } from "../browser-benchmark.mjs";
+import { summarizePairs, main, readBenchmarkPlan } from "../browser-benchmark.mts";
+import type { BenchmarkPairRun } from "../browser-benchmark.mts";
+import { required } from "./helpers.mts";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 test("paired timing excludes warmups, failures and different action histories, and separates model runs", () => {
-  const make = (sample, transport, extra = {}) => ({
+  const make = (sample: number, transport: BenchmarkPairRun['transport'], extra: Partial<BenchmarkPairRun> = {}): BenchmarkPairRun => ({
     case: "a",
     sample,
     transport,
@@ -32,11 +34,11 @@ test("paired timing excludes warmups, failures and different action histories, a
     make(0, "combined", { mode: "jev", lifecycleMs: 300, adapterMode: "snapshot-command" }),
   ];
   const result = summarizePairs(runs);
-  assert.equal(result[0].pairs, 3);
-  assert.equal(result[0].comparablePairs, 1);
-  assert.equal(result[0].medianPairedReductionFraction, 0.5);
-  assert.equal(result[1].medianPairedReductionFraction, -0.5);
-  assert.deepEqual(result[1].combinedAdapterModes, ["snapshot-command"]);
+  assert.equal(required(result[0]).pairs, 3);
+  assert.equal(required(result[0]).comparablePairs, 1);
+  assert.equal(required(result[0]).medianPairedReductionFraction, 0.5);
+  assert.equal(required(result[1]).medianPairedReductionFraction, -0.5);
+  assert.deepEqual(required(result[1]).combinedAdapterModes, ["snapshot-command"]);
 });
 
 test("benchmark rejects empty scopes and excessive samples or model budgets before launching anything", async () => {

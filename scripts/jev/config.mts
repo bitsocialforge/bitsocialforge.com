@@ -4,19 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const loadedKeys = new Set();
+const loadedKeys = new Set<string>();
 export class JevConfigError extends Error {
-  constructor(code) {
+  code: string;
+  constructor(code: string) {
     super(code);
     this.name = "JevConfigError";
     this.code = code;
   }
 }
-const fail = (code) => {
+function fail(code: string): never {
   throw new JevConfigError(code);
 };
 
-function readSmallFile(file, code, optional = false) {
+function readSmallFile(file: string, code: string, optional = false): string | undefined {
   let fd;
   try {
     fd = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK);
@@ -31,18 +32,20 @@ function readSmallFile(file, code, optional = false) {
     if (length > 16_384) fail(code);
     return buffer.subarray(0, length).toString("utf8");
   } catch (error) {
-    if (optional && error.code === "ENOENT") return undefined;
+    if (optional && error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
     fail(code);
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
 }
 
-export function resolveJevSettings({ apiKey, model, env = process.env, home = os.homedir() } = {}) {
+export interface JevSettingsOptions { apiKey?: string; model?: string; env?: Readonly<Record<string, string | undefined>>; home?: string }
+
+export function resolveJevSettings({ apiKey, model, env = process.env, home = os.homedir() }: JevSettingsOptions = {}) {
   let key = apiKey === undefined ? env.TYPESAFE_API_KEY : apiKey;
-  let selectedModel = model === undefined ? env.JEV_MODEL : model;
+  let selectedModel: unknown = model === undefined ? env.JEV_MODEL : model;
   const keyFile = key === undefined ? env.TYPESAFE_API_KEY_FILE : undefined;
-  let config = {};
+  let config: Record<string, unknown> = {};
   // Explicit runtime credentials and model do not depend on this machine's config.
   if ((key === undefined && keyFile === undefined) || selectedModel === undefined) {
     const explicit = env.JEV_CONFIG_FILE !== undefined;
@@ -53,7 +56,9 @@ export function resolveJevSettings({ apiKey, model, env = process.env, home = os
     const raw = readSmallFile(file, "config_unreadable", !explicit);
     if (raw !== undefined) {
       try {
-        config = JSON.parse(raw);
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail('invalid_config');
+        config = parsed as Record<string, unknown>;
       } catch {
         fail("invalid_config");
       }
@@ -83,10 +88,10 @@ export function resolveJevSettings({ apiKey, model, env = process.env, home = os
   return { apiKey: key, model: selectedModel };
 }
 
-export function redactJevSecrets(value) {
+export function redactJevSecrets(value: unknown) {
   let result = String(value);
   const keys = [...new Set([...loadedKeys, process.env.TYPESAFE_API_KEY?.trim()])]
-    .filter(Boolean)
+    .filter((key): key is string => typeof key === "string" && key.length > 0)
     .sort((left, right) => right.length - left.length);
   for (const key of keys) {
     result = result.split(key).join("[redacted]");
@@ -97,7 +102,7 @@ export function redactJevSecrets(value) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.length !== 3 || process.argv[2] !== "--check") {
     console.log(
-      "Usage: node scripts/jev/config.mjs --check (checks local credentials and pinned model; no network)",
+      "Usage: node --experimental-strip-types scripts/jev/config.mts --check (checks local credentials and pinned model; no network)",
     );
     process.exitCode = process.argv.includes("--help") ? 0 : 2;
   } else {

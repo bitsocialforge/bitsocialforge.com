@@ -1,6 +1,6 @@
 # Agent hooks
 
-The only lifecycle behavior is best-effort formatting of existing edited JS/TS files with the installed oxfmt. Shared implementation: `scripts/agent-hooks/format.mjs`; native wrappers: `.codex/hooks/format.sh`, `.cursor/hooks/format.sh`, and `.claude/hooks/format.sh`.
+The only lifecycle behavior is best-effort formatting of existing edited JS/TS files with the installed oxfmt. Shared implementation: `scripts/agent-hooks/format.mts`; native wrappers: `.codex/hooks/format.sh`, `.cursor/hooks/format.sh`, and `.claude/hooks/format.sh`.
 
 | App | Entry point | Event |
 |---|---|---|

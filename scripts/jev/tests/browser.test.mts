@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validatePlan, candidatesFromSnapshot, runBrowserPlan } from "../browser-plan.mjs";
-import { createJevClient, JevError } from "../client.mjs";
+import { validatePlan, candidatesFromSnapshot, runBrowserPlan } from "../browser-plan.mts";
+import { createJevClient, JevError } from "../client.mts";
 import {
   canonicalNavigationAllowed,
   browserOriginGuard,
   createPlaywrightDriver,
   findPlaywrightCli,
-} from "../browser-playwright.mjs";
+} from "../browser-playwright.mts";
 import { runInNewContext } from "node:vm";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,7 +15,24 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const basePlan = () => ({
+import type { BrowserDriver, BrowserPlan, Assertion } from "../browser-plan.mts";
+import type { JevClientOptions } from "../client.mts";
+import { required, record, jevBody } from "./helpers.mts";
+
+type PlanFixture = Omit<BrowserPlan, 'origin' | 'limits'> & { limits?: Partial<BrowserPlan['limits']> };
+type FixtureDriver = BrowserDriver & { adapterMode?: string; inspect(): { stage: number; closed: number; reloaded: number } };
+
+function booleanAssertions(value: unknown): boolean[] {
+  assert.ok(Array.isArray(value) && value.every((item: unknown) => typeof item === 'boolean'));
+  return value as boolean[];
+}
+
+function executeFunction(value: unknown, args: unknown[]): unknown {
+  assert.ok(typeof value === 'function');
+  return Reflect.apply(value, undefined, args);
+}
+
+const basePlan = (): PlanFixture => ({
   version: 1,
   url: "http://127.0.0.1:4173/",
   goal: "Open settings, choose Dark, then close settings.",
@@ -55,11 +72,11 @@ test("baseline without the explicit live flag cannot report an unexecuted flow a
     await writeFile(planFile, JSON.stringify(basePlan()));
     const result = spawnSync(
       process.execPath,
-      [fileURLToPath(new URL("../browser.mjs", import.meta.url)), "--plan", planFile, "--baseline"],
+      ["--experimental-strip-types", fileURLToPath(new URL("../browser.mts", import.meta.url)), "--plan", planFile, "--baseline"],
       { encoding: "utf8" },
     );
     assert.equal(result.status, 2);
-    assert.equal(JSON.parse(result.stdout).reason, "baseline_requires_live");
+    assert.equal(record(JSON.parse(result.stdout)).reason, "baseline_requires_live");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -85,7 +102,8 @@ test("unreadable plan diagnostics identify the bounded path without exposing an 
   const result = spawnSync(
     process.execPath,
     [
-      fileURLToPath(new URL("../browser.mjs", import.meta.url)),
+      "--experimental-strip-types",
+      fileURLToPath(new URL("../browser.mts", import.meta.url)),
       "--plan",
       "/missing/fixture-secret/plan.json",
     ],
@@ -95,8 +113,9 @@ test("unreadable plan diagnostics identify the bounded path without exposing an 
     },
   );
   assert.equal(result.status, 2);
-  const report = JSON.parse(result.stdout);
+  const report = record(JSON.parse(result.stdout));
   assert.equal(report.reason, "invalid_or_unreadable_plan");
+  assert.ok(typeof report.plan === "string");
   assert.ok(report.plan.endsWith("/missing/[redacted]/plan.json"));
   assert.equal(result.stdout.includes("fixture-secret"), false);
 });
@@ -130,7 +149,7 @@ test("browser commands never inherit the key, model or credential-location overr
     driver = createPlaywrightDriver({
       execute: async (_file, _args, options) => {
         commands++;
-        for (const name of names) assert.equal(options.env[name], undefined);
+        for (const name of names) assert.equal(options.env?.[name], undefined);
         return { stdout: "### Result\ntrue\n", stderr: "" };
       },
     });
@@ -146,16 +165,16 @@ test("browser commands never inherit the key, model or credential-location overr
 });
 
 test("origin guards run in the CLI VM without a URL global and preserve exact origin boundaries", async () => {
-  const permitted = runInNewContext(`(${canonicalNavigationAllowed.toString()})`, {});
-  assert.equal(permitted("https://local.example/path", "https://local.example"), true);
-  assert.equal(permitted("https://local.example.evil.test/path", "https://local.example"), false);
-  assert.equal(permitted("https://local.example:8443/path", "https://local.example"), false);
-  const guard = runInNewContext(
+  const permitted: unknown = runInNewContext(`(${canonicalNavigationAllowed.toString()})`, {});
+  assert.equal(executeFunction(permitted, ["https://local.example/path", "https://local.example"]), true);
+  assert.equal(executeFunction(permitted, ["https://local.example.evil.test/path", "https://local.example"]), false);
+  assert.equal(executeFunction(permitted, ["https://local.example:8443/path", "https://local.example"]), false);
+  const guard: unknown = runInNewContext(
     `async page => { ${browserOriginGuard("https://local.example")} return true; }`,
     {},
   );
-  assert.equal(await guard({ evaluate: async () => "https://local.example" }), true);
-  await assert.rejects(guard({ evaluate: async () => "https://evil.test" }), /origin_changed/);
+  assert.equal(await executeFunction(guard, [{ evaluate: async () => "https://local.example" }]), true);
+  await assert.rejects(async () => { await executeFunction(guard, [{ evaluate: async () => "https://evil.test" }]); }, /origin_changed/);
 });
 
 test("URL completion assertions use the same canonical form as the browser without mutating the input", () => {
@@ -163,9 +182,9 @@ test("URL completion assertions use the same canonical form as the browser witho
   plan.url = "http://LOCALHOST:80";
   plan.assertions = [{ type: "url", equals: "http://LOCALHOST:80" }];
   const validated = validatePlan(plan);
-  assert.equal(validated.assertions[0].equals, "http://localhost/");
-  assert.equal(validated.assertions[0].equals, validated.url);
-  assert.equal(plan.assertions[0].equals, "http://LOCALHOST:80");
+  assert.equal(record(required(validated.assertions[0])).equals, "http://localhost/");
+  assert.equal(record(required(validated.assertions[0])).equals, validated.url);
+  assert.equal(record(required(plan.assertions[0])).equals, "http://LOCALHOST:80");
 });
 
 test("live CLI preflights missing credentials and model before a browser command can run", async () => {
@@ -179,7 +198,7 @@ test("live CLI preflights missing credentials and model before a browser command
     ]) {
       const result = spawnSync(
         process.execPath,
-        [fileURLToPath(new URL("../browser.mjs", import.meta.url)), "--plan", planFile, "--live"],
+        ["--experimental-strip-types", fileURLToPath(new URL("../browser.mts", import.meta.url)), "--plan", planFile, "--live"],
         {
           encoding: "utf8",
           env: {
@@ -191,19 +210,19 @@ test("live CLI preflights missing credentials and model before a browser command
         },
       );
       assert.equal(result.status, 2);
-      assert.equal(JSON.parse(result.stdout).reason, reason);
+      assert.equal(record(JSON.parse(result.stdout)).reason, reason);
     }
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
-function fixtureDriver(extra = {}) {
+function fixtureDriver(extra: Partial<BrowserDriver> = {}): FixtureDriver {
   let stage = 0,
     closed = 0,
     reloaded = 0;
   return {
     open: async () => {},
-    observe: async () => ({ url: basePlan().url, snapshot: snapshots[stage] }),
+    observe: async () => ({ url: basePlan().url, snapshot: required(snapshots[stage]) }),
     assert: async () => [stage === 3],
     act: async () => {
       stage++;
@@ -219,7 +238,7 @@ function fixtureDriver(extra = {}) {
     ...extra,
   };
 }
-function fixtureClient(selected = ["open", "theme", "close"], options = {}) {
+function fixtureClient(selected = ["open", "theme", "close"], options: Partial<JevClientOptions> = {}) {
   let index = 0;
   return createJevClient({
     live: true,
@@ -227,11 +246,13 @@ function fixtureClient(selected = ["open", "theme", "close"], options = {}) {
     apiKey: "fixture-key",
     ...options,
     fetchImpl: async (_url, init) => {
-      const body = JSON.parse(init.body);
-      const [questionId, question] = Object.entries(body.questions)[0];
-      const choice = selected[index++];
+      const body = jevBody(init);
+      const [questionId, question] = required(Object.entries(body.questions)[0]);
+      assert.equal(question.type, "choice");
+      assert.ok(question.type === "choice");
+      const choice = required(selected[index++]);
       return Response.json({
-        model: body.model,
+        model: body["model"],
         answers: {
           [questionId]: {
             type: "choice",
@@ -253,7 +274,7 @@ test("one invocation performs three model decisions and proves persistence befor
   const report = await runBrowserPlan(basePlan(), { driver, client: fixtureClient() });
   assert.equal(report.status, "completed");
   assert.deepEqual(report.actions, ["open", "theme", "close"]);
-  assert.equal(report.usage.requests, 3);
+  assert.equal(record(report.usage).requests, 3);
   assert.deepEqual(driver.inspect(), { stage: 3, closed: 1, reloaded: 1 });
 });
 
@@ -275,7 +296,7 @@ test("combined observations retain required actions, fresh target reads and relo
     else refreshed++;
     return {
       ...(await originalObserve()),
-      assertions: assertions ? await originalAssert(assertions) : [],
+      assertions: assertions ? booleanAssertions(await originalAssert(assertions)) : [],
     };
   };
   driver.assert = async () => {
@@ -293,10 +314,8 @@ test("combined observations retain required actions, fresh target reads and relo
 
 test("malformed combined assertion results cannot fall back to a passing separate assertion", async () => {
   for (const assertions of [undefined, null, [], [1], [true, true]]) {
-    const driver = fixtureDriver({
-      observe: async () => ({ url: basePlan().url, snapshot: snapshots[0], assertions }),
-      assert: async () => [true],
-    });
+    const driver = fixtureDriver({ assert: async () => [true] });
+    Reflect.set(driver, 'observe', async () => ({ url: basePlan().url, snapshot: required(snapshots[0]), assertions }));
     const report = await runBrowserPlan(basePlan(), { driver, baseline: true });
     assert.equal(report.reason, "browser_assertions_invalid");
     assert.deepEqual(report.actions, []);
@@ -306,8 +325,8 @@ test("malformed combined assertion results cannot fall back to a passing separat
 
 test("installed-CLI observation transports preserve exact assertion semantics and report their actual mode", async () => {
   for (const combined of [true, false, "ref-less"]) {
-    const calls = [];
-    const target = (name) => ({
+    const calls: string[][] = [];
+    const target = (name: string) => ({
       count: async () => (name === "absent" ? 0 : name === "duplicate" ? 2 : 1),
       isVisible: async () => name !== "invisible",
       isChecked: async () => name === "checked",
@@ -317,44 +336,44 @@ test("installed-CLI observation transports preserve exact assertion semantics an
     const page = {
       url: () => basePlan().url,
       evaluate: async () => new URL(basePlan().url).origin,
-      ariaSnapshot: async (options) => {
+      ariaSnapshot: async (options: { mode: string }) => {
         assert.equal(options.mode, "ai");
         return combined === "ref-less"
-          ? snapshots[0].replace(/ \[ref=[^\]]+\]/g, "")
-          : snapshots[0];
+          ? required(snapshots[0]).replace(/ \[ref=[^\]]+\]/g, "")
+          : required(snapshots[0]);
       },
-      getByRole: (_, { name }) => target(name),
-      locator: () => ({ evaluate: async (_, value) => value === "dark" }),
+      getByRole: (_: string, { name }: { name: string }) => target(name),
+      locator: () => ({ evaluate: async (_: unknown, value: string) => value === "dark" }),
     };
     const driver = createPlaywrightDriver({
       execute: async (_file, args) => {
         calls.push(args);
         if (args[0] === "open" || args[0] === "close") return { stdout: "", stderr: "" };
         if (args[1] === "snapshot") {
-          await writeFile(args[2].slice("--filename=".length), snapshots[0]);
-          return { stdout: "" };
+          await writeFile(required(args[2]).slice("--filename=".length), required(snapshots[0]));
+          return { stdout: "", stderr: "" };
         }
-        if (args[2].includes("page.goto("))
+        if (required(args[2]).includes("page.goto("))
           return {
-            stdout: `### Result\n${JSON.stringify({ ariaSnapshot: combined !== false })}\n`,
+            stdout: `### Result\n${JSON.stringify({ ariaSnapshot: combined !== false })}\n`, stderr: "",
           };
-        const result = await runInNewContext(`(${args[2]})(page)`, { page });
-        return { stdout: `### Result\n${JSON.stringify(result)}\n` };
+        const result: unknown = await runInNewContext(`(${args[2]})(page)`, { page });
+        return { stdout: `### Result\n${JSON.stringify(result)}\n`, stderr: "" };
       },
     });
     try {
       await driver.open(validatePlan(basePlan()));
-      const assertions = [
+      const assertions: Assertion[] = [
         { type: "url", equals: basePlan().url },
         { type: "bodyClass", value: "dark", present: true },
-        ...[
+        ...([
           ["absent", "hidden"],
           ["invisible", "hidden"],
           ["checked", "checked"],
           ["unchecked", "unchecked"],
           ["normal", "visible"],
           ["duplicate", "hidden"],
-        ].map(([name, state]) => ({ type: "role", role: "button", name, state })),
+        ] as const).map(([name, state]): Assertion => ({ type: "role", role: "button", name, state })),
         { type: "role", role: "textbox", name: "input", state: "value", equals: "exact value" },
         { type: "role", role: "heading", name: "heading", state: "text", equals: "Exact text" },
         { type: "role", role: "heading", name: "heading", state: "text", equals: "Wrong text" },
@@ -363,7 +382,7 @@ test("installed-CLI observation transports preserve exact assertion semantics an
       const observation = await driver.observe(assertions);
       assert.equal(calls.length - before, combined === true ? 1 : combined === false ? 2 : 3);
       assert.equal(driver.adapterMode, combined === true ? "combined-aria" : "snapshot-command");
-      assert.equal(observation.snapshot, snapshots[0]);
+      assert.equal(observation.snapshot, required(snapshots[0]));
       assert.deepEqual(observation.assertions, [
         true,
         true,
@@ -396,32 +415,36 @@ test("page instructions cannot expand the action list; ambiguous targets are una
     candidatesFromSnapshot(plan, '- button "Settings" [ref=e1]\n- button "Settings" [ref=e2]'),
     [],
   );
-  assert.equal(candidatesFromSnapshot(plan, snapshots[1])[0].id, "theme");
+  assert.equal(required(candidatesFromSnapshot(plan, required(snapshots[1]))[0]).id, "theme");
 });
 
 for (const [name, mutate] of Object.entries({
-  "remote URL without explicit authorization": (p) => {
+  "remote URL without explicit authorization": (p: PlanFixture) => {
     p.url = "https://example.com/";
   },
-  "unrecognized top-level field": (p) => {
-    p.code = "process.exit()";
+  "unrecognized top-level field": (p: PlanFixture) => {
+    Reflect.set(p, "code", "process.exit()");
   },
-  "unrecognized limit": (p) => {
-    p.limits = { noLimit: true };
+  "unrecognized limit": (p: PlanFixture) => {
+    Reflect.set(p, "limits", { noLimit: true });
   },
-  "unoffered arbitrary JavaScript": (p) => {
-    p.actions[0].op = "eval";
+  "unoffered arbitrary JavaScript": (p: PlanFixture) => {
+    Reflect.set(required(p.actions[0]), "op", "eval");
   },
-  "reserved action id": (p) => {
-    p.actions[0].id = "hand_back";
+  "reserved action id": (p: PlanFixture) => {
+    required(p.actions[0]).id = "hand_back";
   },
-  "sensitive action without explicit authorization": (p) => {
-    p.actions[0].name = "Publish post";
+  "sensitive action without explicit authorization": (p: PlanFixture) => {
+    required(p.actions[0]).name = "Publish post";
   },
-  "cross-origin completion URL": (p) => {
+  "cross-origin completion URL": (p: PlanFixture) => {
     p.assertions = [{ type: "url", equals: "https://example.com/" }];
   },
-  "absence of deterministic assertions": (p) => {
+  "non-string optional role comparison": (p: PlanFixture) => {
+    p.assertions = [{ type: "role", role: "button", name: "Settings", state: "visible" }];
+    Reflect.set(required(p.assertions[0]), "equals", 123);
+  },
+  "absence of deterministic assertions": (p: PlanFixture) => {
     p.assertions = [];
   },
 }))
@@ -434,11 +457,11 @@ for (const [name, mutate] of Object.entries({
 for (const missing of [false, true])
   test(`transient ${missing ? "missing target" : "ref replacement"} discards the decision and plans again before acting`, async () => {
     const plan = basePlan();
-    plan.actions = [plan.actions[0]];
+    plan.actions = [required(plan.actions[0])];
     plan.requiredActions = ["open"];
     plan.reloadBeforeFinal = false;
     let observed = 0;
-    const acted = [];
+    const acted: string[] = [];
     const driver = fixtureDriver({
       observe: async () => {
         observed++;
@@ -449,7 +472,7 @@ for (const missing of [false, true])
         };
       },
       assert: async () => [acted.length === 1],
-      act: async (action) => acted.push(action.ref),
+      act: async (action) => { acted.push(action.ref); },
     });
     const report = await runBrowserPlan(plan, { driver, client: fixtureClient(["open", "open"]) });
     assert.equal(report.status, "completed");
@@ -457,7 +480,7 @@ for (const missing of [false, true])
     assert.deepEqual(acted, ["e2"]);
     assert.deepEqual(report.actions, ["open"]);
     assert.equal(report.staleReplans, 1);
-    assert.equal(report.usage.requests, 2);
+    assert.equal(record(report.usage).requests, 2);
     assert.equal(driver.inspect().closed, 1);
   });
 
@@ -481,7 +504,7 @@ test("continued target churn exhausts two replans and hands back without any act
   assert.equal(report.status, "incomplete");
   assert.equal(report.flowCompleted, false);
   assert.equal(report.staleReplans, 2);
-  assert.equal(report.usage.requests, 3);
+  assert.equal(record(report.usage).requests, 3);
   assert.deepEqual(report.actions, []);
   assert.equal(acted, 0);
   assert.equal(driver.inspect().closed, 1);
@@ -506,7 +529,7 @@ test("stale replanning consumes the existing step and request budgets", async ()
       client: fixtureClient(["open", "open"], requestLimit ? { maxRequests: 1 } : {}),
     });
     assert.equal(report.reason, requestLimit ? "budget_exhausted" : "step_limit");
-    assert.equal(report.usage.requests, 1);
+    assert.equal(record(report.usage).requests, 1);
     assert.equal(report.flowCompleted, false);
     assert.equal(acted, 0);
   }
@@ -515,7 +538,7 @@ test("stale replanning consumes the existing step and request budgets", async ()
 test("origin drift, uncertain answer, provider failure, and cleanup failure never pass", async () => {
   const drift = await runBrowserPlan(basePlan(), {
     driver: fixtureDriver({
-      observe: async () => ({ url: "https://example.com", snapshot: snapshots[0] }),
+      observe: async () => ({ url: "https://example.com", snapshot: required(snapshots[0]) }),
     }),
     baseline: true,
   });

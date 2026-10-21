@@ -29,5 +29,5 @@ jobs:
         run: corepack yarn build
       - name: Check AI workflow generation
         run: corepack yarn ai-workflow:check
-      - name: Test AI workflow fixtures
-        run: corepack yarn ai-workflow:test
+      - name: Test maintained TypeScript scripts
+        run: corepack yarn test:scripts

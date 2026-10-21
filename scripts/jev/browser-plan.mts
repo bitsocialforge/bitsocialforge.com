@@ -1,9 +1,38 @@
-import { JevError } from "./client.mjs";
+import type { ChoiceAnswer, ChoiceQuestion, JevRequest } from "./client.mts";
+import { JevError } from "./client.mts";
 
-const fail = (code) => {
+
+export interface Target { role: string; name: string; nth?: number; within?: { role: string; name: string } }
+export interface Action extends Target { id: string; op: 'click' | 'fill' | 'select' | 'check' | 'uncheck'; value?: string; maxUses?: number }
+export type Assertion = { type: 'url'; equals: string } | { type: 'bodyClass'; value: string; present: boolean } | (Target & { type: 'role'; state: 'visible' | 'hidden' | 'checked' | 'unchecked' | 'value' | 'text'; equals?: string });
+export interface SemanticCheck extends Target { id: string; criterion: string }
+export interface BrowserPlan {
+ version: 1; url: string; origin: string; goal: string; actions: Action[]; assertions: Assertion[]; requiredActions: string[];
+ allowRemote?: boolean; allowSensitiveActions?: boolean; reloadBeforeFinal?: boolean; semanticChecks?: SemanticCheck[];
+ limits: { maxSteps: number; deadlineMs: number; maxSnapshotBytes: number; maxCostUsd: number; minProbability: number };
+}
+export interface SnapshotNode { role: string; name: string; ref?: string; disabled: boolean; indent: number; ancestors: SnapshotNode[]; options: string[] }
+export type Candidate = Action & { ref: string };
+export interface Observation { url: string; snapshot: string; assertions?: boolean[] }
+export interface BrowserDriver {
+ readonly adapterMode?: string;
+ open(plan: BrowserPlan): Promise<void>; observe(assertions?: Assertion[]): Promise<Observation>;
+ assert(assertions: Assertion[]): Promise<unknown>; act(action: Candidate): Promise<void>;
+ text(target: Target): Promise<unknown>; reload(): Promise<void>; close(): Promise<void>;
+}
+export interface BrowserClient {
+ ask(request: JevRequest<Record<string, ChoiceQuestion>>): Promise<{ answers: Record<string, ChoiceAnswer> }>;
+ stats(): unknown;
+}
+export interface BrowserReport {
+ version: number; status: string; flowCompleted: boolean; staleReplans: number; reason: string; mode: string;
+ origin: string; actions: string[]; assertions: boolean[]; semantic: { id: string; verdict: string; advisory: boolean }[]; semanticStatus: string;
+}
+
+function fail(code: string): never {
   throw new JevError(code);
 };
-const text = (value, max = 300) =>
+const text = (value: unknown, max = 300): value is string =>
   typeof value === "string" && value.length <= max && !/[\u0000-\u0008]/.test(value);
 const roles = new Set([
   "button",
@@ -23,28 +52,28 @@ const roles = new Set([
   "navigation",
   "region",
 ]);
-const keys = (value, allowed) =>
-  value &&
+const keys = (value: unknown, allowed: string[]): value is Record<string, unknown> =>
+  value !== null &&
   typeof value === "object" &&
   !Array.isArray(value) &&
   Object.keys(value).every((key) => allowed.includes(key));
-function target(value) {
+function target(value: Record<string, unknown>): asserts value is Record<string, unknown> & Target {
   if (
-    !roles.has(value.role) ||
+    (typeof value.role !== 'string' || !roles.has(value.role)) ||
     !text(value.name) ||
-    (value.nth !== undefined && (!Number.isInteger(value.nth) || value.nth < 0 || value.nth > 20))
+    (value.nth !== undefined && (typeof value.nth !== 'number' || !Number.isInteger(value.nth) || value.nth < 0 || value.nth > 20))
   )
     fail("invalid_target");
   if (
     value.within !== undefined &&
     (!keys(value.within, ["role", "name"]) ||
-      !roles.has(value.within.role) ||
+      (typeof value.within.role !== 'string' || !roles.has(value.within.role)) ||
       !text(value.within.name))
   )
     fail("invalid_target");
 }
 
-export function validatePlan(plan) {
+export function validatePlan(plan: unknown): BrowserPlan {
   if (
     !keys(plan, [
       "version",
@@ -66,6 +95,7 @@ export function validatePlan(plan) {
     fail("invalid_plan");
   let url;
   try {
+    if (typeof plan.url !== 'string') fail('invalid_url');
     url = new URL(plan.url);
   } catch {
     fail("invalid_url");
@@ -93,21 +123,21 @@ export function validatePlan(plan) {
   for (const action of plan.actions) {
     if (
       !keys(action, ["id", "op", "role", "name", "within", "nth", "value", "maxUses"]) ||
-      !/^[a-z][a-z0-9_]{0,39}$/.test(action.id) ||
+      (typeof action.id !== 'string' || !/^[a-z][a-z0-9_]{0,39}$/.test(action.id)) ||
       action.id === "hand_back" ||
       ids.has(action.id)
     )
       fail("invalid_action");
     ids.add(action.id);
     target(action);
-    const allowed = {
+    const allowed: Record<string, string[]> = {
       click: ["button", "link", "tab", "menuitem"],
       fill: ["textbox", "searchbox"],
       select: ["combobox"],
       check: ["checkbox", "radio", "switch"],
       uncheck: ["checkbox", "switch"],
     };
-    if (!allowed[action.op]?.includes(action.role)) fail("invalid_action");
+    if (typeof action.op !== 'string' || !allowed[action.op]?.includes(action.role)) fail("invalid_action");
     if (
       ["fill", "select"].includes(action.op)
         ? !text(action.value, 1000)
@@ -116,7 +146,7 @@ export function validatePlan(plan) {
       fail("invalid_action");
     if (
       action.maxUses !== undefined &&
-      (!Number.isInteger(action.maxUses) || action.maxUses < 1 || action.maxUses > 3)
+      (typeof action.maxUses !== 'number' || !Number.isInteger(action.maxUses) || action.maxUses < 1 || action.maxUses > 3)
     )
       fail("invalid_action");
     // This conservative guard catches common mistakes; the explicit plan still needs a human/agent
@@ -153,19 +183,20 @@ export function validatePlan(plan) {
     if (assertion.type === "url") {
       let expected;
       try {
+        if (typeof assertion.equals !== 'string') fail('invalid_assertion');
         expected = new URL(assertion.equals);
       } catch {
         fail("invalid_assertion");
       }
       if (expected.origin !== url.origin) fail("invalid_assertion");
     } else if (assertion.type === "bodyClass") {
-      if (!/^[\w-]{1,100}$/.test(assertion.value) || typeof assertion.present !== "boolean")
+      if ((typeof assertion.value !== 'string' || !/^[\w-]{1,100}$/.test(assertion.value)) || typeof assertion.present !== "boolean")
         fail("invalid_assertion");
     } else if (assertion.type === "role") {
       target(assertion);
       if (
-        !["visible", "hidden", "checked", "unchecked", "value", "text"].includes(assertion.state) ||
-        (["value", "text"].includes(assertion.state) && !text(assertion.equals, 2000))
+        (typeof assertion.state !== 'string' || !['visible', 'hidden', 'checked', 'unchecked', 'value', 'text'].includes(assertion.state)) ||
+        ((assertion.equals !== undefined || ["value", "text"].includes(assertion.state)) && !text(assertion.equals, 2000))
       )
         fail("invalid_assertion");
     } else fail("invalid_assertion");
@@ -179,7 +210,7 @@ export function validatePlan(plan) {
   for (const check of plan.semanticChecks || []) {
     if (
       !keys(check, ["id", "criterion", "role", "name", "within", "nth"]) ||
-      !/^[a-z][a-z0-9_]{0,39}$/.test(check.id) ||
+      (typeof check.id !== 'string' || !/^[a-z][a-z0-9_]{0,39}$/.test(check.id)) ||
       semanticIds.has(check.id) ||
       !text(check.criterion, 1000) ||
       !check.criterion.trim()
@@ -188,14 +219,6 @@ export function validatePlan(plan) {
     target(check);
     semanticIds.add(check.id);
   }
-  const limits = {
-    maxSteps: 8,
-    deadlineMs: 120_000,
-    maxSnapshotBytes: 40_000,
-    maxCostUsd: 0.01,
-    minProbability: 0.8,
-    ...plan.limits,
-  };
   if (
     plan.limits !== undefined &&
     !keys(plan.limits, [
@@ -207,73 +230,95 @@ export function validatePlan(plan) {
     ])
   )
     fail("invalid_limits");
+  const limits: Record<string, unknown> = {
+    maxSteps: 8,
+    deadlineMs: 120_000,
+    maxSnapshotBytes: 40_000,
+    maxCostUsd: 0.01,
+    minProbability: 0.8,
+    ...plan.limits,
+  };
   if (
+    typeof limits.maxSteps !== "number" ||
     !Number.isInteger(limits.maxSteps) ||
     limits.maxSteps < 1 ||
     limits.maxSteps > 20 ||
+    typeof limits.deadlineMs !== "number" ||
     !Number.isInteger(limits.deadlineMs) ||
     limits.deadlineMs < 1000 ||
     limits.deadlineMs > 300_000 ||
+    typeof limits.maxSnapshotBytes !== "number" ||
     !Number.isInteger(limits.maxSnapshotBytes) ||
     limits.maxSnapshotBytes < 100 ||
     limits.maxSnapshotBytes > 60_000 ||
+    typeof limits.maxCostUsd !== "number" ||
     !Number.isFinite(limits.maxCostUsd) ||
     limits.maxCostUsd <= 0 ||
     limits.maxCostUsd > 1 ||
+    typeof limits.minProbability !== "number" ||
     !Number.isFinite(limits.minProbability) ||
     limits.minProbability < 0.5 ||
     limits.minProbability > 1
   )
     fail("invalid_limits");
+  // The complete input shape and every nested action/assertion were validated above.
+  const validated = plan as unknown as BrowserPlan;
   return {
-    ...plan,
+    ...validated,
     url: url.href,
     origin: url.origin,
-    assertions: plan.assertions.map((assertion) =>
+    assertions: validated.assertions.map((assertion) =>
       assertion.type === "url"
         ? { ...assertion, equals: new URL(assertion.equals).href }
         : assertion,
     ),
-    limits,
+    limits: {
+      maxSteps: limits.maxSteps,
+      deadlineMs: limits.deadlineMs,
+      maxSnapshotBytes: limits.maxSnapshotBytes,
+      maxCostUsd: limits.maxCostUsd,
+      minProbability: limits.minProbability,
+    },
   };
 }
 
 // Only snapshot nodes carrying a current CLI ref can become candidates. YAML content is never
 // evaluated. Names with unsupported serialization are unavailable rather than guessed.
-export function snapshotNodes(snapshot) {
-  const nodes = [];
-  const stack = [];
+export function snapshotNodes(snapshot: string): SnapshotNode[] {
+  const nodes: SnapshotNode[] = [];
+  const stack: SnapshotNode[] = [];
   for (const line of snapshot.split("\n")) {
     const match = line.match(/^(\s*)- ([a-z]+)(?: ("(?:[^"\\]|\\.)*"))?(.*)$/);
     if (!match) continue;
-    let name;
+    let name: unknown;
     try {
       name = match[3] ? JSON.parse(match[3]) : "";
     } catch {
       continue;
     }
-    const indent = match[1].length;
-    while (stack.length && stack.at(-1).indent >= indent) stack.pop();
-    const node = {
-      role: match[2],
+    if (typeof name !== 'string') continue;
+    const indent = match[1]!.length;
+    while (stack.length && stack.at(-1)!.indent >= indent) stack.pop();
+    const node: SnapshotNode = {
+      role: match[2]!,
       name,
-      ref: match[4].match(/\[ref=(e\d+)\]/)?.[1],
-      disabled: match[4].includes("[disabled]"),
+      ref: match[4]!.match(/\[ref=(e\d+)\]/)?.[1],
+      disabled: match[4]!.includes("[disabled]"),
       indent,
       ancestors: [...stack],
       options: [],
     };
     if (node.role === "option" && stack.at(-1)?.role === "combobox")
-      stack.at(-1).options.push(name);
+      stack.at(-1)!.options.push(name);
     nodes.push(node);
     stack.push(node);
   }
   return nodes;
 }
 
-export function candidatesFromSnapshot(plan, snapshot, history = []) {
+export function candidatesFromSnapshot(plan: BrowserPlan, snapshot: string, history: string[] = []) {
   const nodes = snapshotNodes(snapshot);
-  const candidates = [];
+  const candidates: Candidate[] = [];
   for (const action of plan.actions) {
     if (history.filter((id) => id === action.id).length >= (action.maxUses || 1)) continue;
     const matches = nodes.filter(
@@ -285,25 +330,25 @@ export function candidatesFromSnapshot(plan, snapshot, history = []) {
         (!action.within ||
           node.ancestors.some(
             (ancestor) =>
-              ancestor.role === action.within.role && ancestor.name === action.within.name,
+              ancestor.role === action.within!.role && ancestor.name === action.within!.name,
           )),
     );
     const node =
       action.nth === undefined ? (matches.length === 1 ? matches[0] : null) : matches[action.nth];
-    if (!node || (action.op === "select" && !node.options.includes(action.value))) continue;
-    candidates.push({ ...action, ref: node.ref });
+    if (!node || (action.op === "select" && !node.options.includes(action.value ?? ""))) continue;
+    if (node.ref) candidates.push({ ...action, ref: node.ref });
   }
   return candidates;
 }
 
 export async function runBrowserPlan(
-  planInput,
-  { driver, client, baseline = false, now = Date.now } = {},
+  planInput: unknown,
+  { driver, client, baseline = false, now = Date.now }: { driver: BrowserDriver; client?: BrowserClient | null; baseline?: boolean; now?: () => number },
 ) {
   const plan = validatePlan(planInput);
   const started = now();
-  const history = [];
-  const report = {
+  const history: string[] = [];
+  const report: BrowserReport = {
     version: 1,
     status: "incomplete",
     flowCompleted: false,
@@ -319,7 +364,7 @@ export async function runBrowserPlan(
   const withinDeadline = () => {
     if (now() - started >= plan.limits.deadlineMs) fail("deadline_exceeded");
   };
-  async function observe(assertions) {
+  async function observe(assertions?: Assertion[]): Promise<Observation & { assertions: boolean[] }> {
     withinDeadline();
     const observation = await driver.observe(assertions);
     withinDeadline();
@@ -344,7 +389,7 @@ export async function runBrowserPlan(
       observation.assertions = results;
       withinDeadline();
     }
-    return observation;
+    return { ...observation, assertions: observation.assertions ?? [] };
   }
   try {
     await driver.open(plan);
@@ -380,7 +425,7 @@ export async function runBrowserPlan(
             const content = await driver.text(check);
             if (typeof content !== "string" || content.length > 8000)
               fail("semantic_text_unavailable");
-            const result = await client.ask({
+            const result = await client!.ask({
               state: { criterion: check.criterion, untrustedText: content },
               questions: {
                 assessment: {
@@ -395,12 +440,12 @@ export async function runBrowserPlan(
                 },
               },
             });
-            const answer = result.answers.assessment;
+            const answer = result.answers.assessment!;
             report.semantic.push({
               id: check.id,
               advisory: true,
               verdict:
-                answer.probabilities[answer.choice] >= plan.limits.minProbability
+                (answer.probabilities[answer.choice] ?? 0) >= plan.limits.minProbability
                   ? answer.choice
                   : "uncertain",
             });
@@ -424,9 +469,9 @@ export async function runBrowserPlan(
       if (step === plan.limits.maxSteps) fail("step_limit");
       const candidates = candidatesFromSnapshot(plan, observation.snapshot, history);
       if (!candidates.length) fail("no_permitted_action");
-      let selected = candidates[0];
+      let selected: Candidate = candidates[0]!;
       if (!baseline) {
-        const result = await client.ask({
+        const result = await client!.ask({
           state: {
             goal: plan.goal,
             untrustedSnapshot: observation.snapshot,
@@ -450,14 +495,15 @@ export async function runBrowserPlan(
             },
           },
         });
-        const answer = result.answers.next_action;
+        const answer = result.answers.next_action!;
         if (
           answer.choice === "hand_back" ||
-          answer.probabilities[answer.choice] < plan.limits.minProbability
+          (answer.probabilities[answer.choice] ?? 0) < plan.limits.minProbability
         )
           fail("model_uncertain");
-        selected = candidates.find((candidate) => candidate.id === answer.choice);
-        if (!selected) fail("invalid_action");
+        const choice = candidates.find((candidate) => candidate.id === answer.choice);
+        if (!choice) fail("invalid_action");
+        selected = choice;
       }
       // The model round trip can outlive a DOM update. Refresh and require the same target ref;
       // the driver additionally checks role/name/visibility immediately before the action.

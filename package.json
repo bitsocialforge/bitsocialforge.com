@@ -11,17 +11,18 @@
   "type": "module",
   "packageManager": "yarn@4.17.1",
   "scripts": {
-    "start": "node scripts/start-dev.mjs",
+    "start": "node --experimental-strip-types scripts/start-dev.mts",
     "dev": "corepack yarn start",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "type-check": "tsc --noEmit",
-    "lint": "oxlint src/**/*.{ts,tsx}",
-    "format": "oxfmt src/**/*.{ts,tsx}",
-    "ai-workflow:sync": "node scripts/sync-ai-workflow.mjs",
-    "ai-workflow:check": "node scripts/validate-ai-workflow.mjs",
-    "ai-workflow:test": "node --test scripts/__tests__/ai-workflow.node-test.mjs scripts/__tests__/agent-hooks.node-test.mjs",
-    "agent:verify": "bash scripts/verify.sh"
+    "type-check": "node --experimental-strip-types scripts/check-typescript-sources.mts && tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "lint": "oxlint src scripts vite.config.ts",
+    "format": "oxfmt src scripts vite.config.ts",
+    "ai-workflow:sync": "node --experimental-strip-types scripts/sync-ai-workflow.mts",
+    "ai-workflow:check": "node --experimental-strip-types scripts/validate-ai-workflow.mts",
+    "ai-workflow:test": "node --experimental-strip-types --test --test-concurrency=1 scripts/__tests__/ai-workflow.node-test.mts scripts/__tests__/agent-hooks.node-test.mts",
+    "agent:verify": "bash scripts/verify.sh",
+    "test:scripts": "node --experimental-strip-types --test --test-concurrency=1 scripts/*.test.mts scripts/__tests__/*.mts scripts/jev/tests/*.test.mts scripts/visual-qa/tests/*.test.mts"
   },
   "dependencies": {
     "@vercel/analytics": "2.0.1",
@@ -29,6 +30,9 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
+    "@types/js-yaml": "4.0.9",
+    "@types/node": "22.20.4",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.3",

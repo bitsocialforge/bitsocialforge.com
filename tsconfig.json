@@ -15,7 +15,9 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2024",
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "allowJs": false,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src", "vite.config.ts"]
 }

@@ -188,6 +188,7 @@ echo ""
 failures=0
 
 run_required_check "TypeScript check passes" corepack yarn type-check || failures=1
+run_required_check "TypeScript script tests pass" corepack yarn test:scripts || failures=1
 run_required_check "Oxlint passes" corepack yarn lint || failures=1
 run_required_check "Vite build passes" corepack yarn build || failures=1
 run_required_check "public/ passthrough files land in dist/" check_public_files_in_dist || failures=1

@@ -11,7 +11,9 @@ import {
   readLocalFile,
   VisualQaError,
   INPUT_USD_PER_MILLION,
-} from "./decisions.mjs";
+} from "./decisions.mts";
+
+import type { Check, DecisionOptions, DecisionResult, Usage } from "./decisions.mts";
 
 export const LIMITS = {
   screenshotBytes: 2 * 1024 * 1024,
@@ -21,13 +23,13 @@ export const LIMITS = {
   checks: 8,
 };
 export const PROVIDER = "openai-decisions";
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const text = (value, max) =>
+const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
+const text = (value: unknown, max: number): value is string =>
   typeof value === "string" &&
   value.trim().length > 0 &&
   value.length <= max &&
   !hasControl(value, true);
-const protectedPath = (file) =>
+const protectedPath = (file: string) =>
   file
     .split(/[\\/]/u)
     .some((part) =>
@@ -36,9 +38,10 @@ const protectedPath = (file) =>
       ),
     );
 
-export function imageMetadata(bytes, file) {
+export function imageMetadata(bytes: Buffer, file: string) {
   const extension = path.extname(file).toLowerCase();
-  let width, height, mime;
+  let width: number | undefined, height: number | undefined;
+  let mime: "image/png" | "image/jpeg";
   if (
     extension === ".png" &&
     bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
@@ -72,7 +75,7 @@ export function imageMetadata(bytes, file) {
       if (bytes[offset] !== 0xff) fail("invalid_image");
       while (bytes[offset] === 0xff) offset++;
       const marker = bytes[offset++];
-      if (offset + 2 > bytes.length) fail("invalid_image");
+      if (marker === undefined || offset + 2 > bytes.length) fail("invalid_image");
       const length = bytes.readUInt16BE(offset);
       if (length < 2 || offset + length > bytes.length) fail("invalid_image");
       if ([0xc0, 0xc1, 0xc2].includes(marker)) {
@@ -91,6 +94,8 @@ export function imageMetadata(bytes, file) {
     mime = "image/jpeg";
   } else fail("unsupported_image");
   if (
+    typeof width !== "number" ||
+    typeof height !== "number" ||
     !Number.isSafeInteger(width) ||
     !Number.isSafeInteger(height) ||
     width < 1 ||
@@ -103,12 +108,12 @@ export function imageMetadata(bytes, file) {
   return { mime, width, height };
 }
 
-export function loadInput(inputFile) {
+export function loadInput(inputFile: unknown) {
   if (typeof inputFile !== "string" || !inputFile || protectedPath(inputFile))
     fail("unsafe_manifest_path");
   const manifestPath = path.resolve(inputFile);
   const manifestBytes = readLocalFile(manifestPath, LIMITS.manifestBytes);
-  let manifest;
+  let manifest: unknown;
   try {
     manifest = JSON.parse(manifestBytes.toString("utf8"));
   } catch {
@@ -142,7 +147,8 @@ export function loadInput(inputFile) {
     (manifest.context !== undefined && !text(manifest.context, 2000))
   )
     fail("invalid_manifest");
-  const ids = new Set();
+  const ids = new Set<string>();
+  const checks: Check[] = [];
   for (const check of manifest.checks) {
     if (
       !isObject(check) ||
@@ -154,11 +160,15 @@ export function loadInput(inputFile) {
     )
       fail("invalid_check");
     ids.add(check.id);
+    checks.push({ id: check.id, criterion: check.criterion });
   }
   const screenshotPath = path.join(path.dirname(manifestPath), screenshot);
   const bytes = readLocalFile(screenshotPath, LIMITS.screenshotBytes);
   return {
-    ...manifest,
+    version: 1,
+    screenshot,
+    checks,
+    ...(typeof manifest.context === "string" ? { context: manifest.context } : {}),
     ...imageMetadata(bytes, screenshot),
     bytes,
     manifestPath,
@@ -168,7 +178,7 @@ export function loadInput(inputFile) {
   };
 }
 
-function assertFresh(input) {
+function assertFresh(input: ReturnType<typeof loadInput>) {
   if (
     sha256(readLocalFile(input.manifestPath, LIMITS.manifestBytes)) !== input.manifestSha256 ||
     sha256(readLocalFile(input.screenshotPath, LIMITS.screenshotBytes)) !== input.screenshotSha256
@@ -176,11 +186,39 @@ function assertFresh(input) {
     fail("input_changed");
 }
 
+export type Options = { input?: string; live?: boolean; provider?: string };
+export type Report = {
+  version: number;
+  provider: string;
+  model: string;
+  mode: string;
+  advisory: boolean;
+  status: string;
+  networkCalls: number;
+  results: DecisionResult[];
+  usage: Usage;
+  estimatedInputCostUsd: number | null;
+  costBasis: { inputUsdPerMillion: number; kind: string; imageTokensKnownBeforeRequest: boolean };
+  threshold: { selectedProbability: number; confidence: number; calibrated: boolean };
+  input?: {
+    screenshot: string;
+    screenshotSha256: string;
+    manifestSha256: string;
+    mime: string;
+    bytes: number;
+    width: number;
+    height: number;
+    checkIds: string[];
+  };
+  reason?: string;
+  apiLatencyMs?: number;
+};
+
 export async function run(
-  { input: inputFile, live = false, provider = PROVIDER } = {},
-  dependencies = {},
+  { input: inputFile, live = false, provider = PROVIDER }: Options = {},
+  dependencies: DecisionOptions = {},
 ) {
-  const report = {
+  const report: Report = {
     version: 1,
     provider,
     model: MODEL,
@@ -233,19 +271,17 @@ export async function run(
   }
 }
 
-export function parseArgs(args) {
-  const options = {};
+export function parseArgs(args: string[]): Options {
+  const options: Options = {};
   for (let index = 0; index < args.length; index++) {
     const flag = args[index];
     if (flag === "--live" && options.live === undefined) options.live = true;
-    else if (
-      ["--input", "--provider"].includes(flag) &&
-      options[flag.slice(2)] === undefined &&
-      args[index + 1] &&
-      !args[index + 1].startsWith("--")
-    )
-      options[flag.slice(2)] = args[++index];
-    else fail("invalid_arguments");
+    else if (flag === "--input" || flag === "--provider") {
+      const key = flag === "--input" ? "input" : "provider";
+      const value = args[++index];
+      if (options[key] !== undefined || !value || value.startsWith("--")) fail("invalid_arguments");
+      options[key] = value;
+    } else fail("invalid_arguments");
   }
   if (!options.input) fail("input_required");
   return options;
@@ -254,7 +290,7 @@ export function parseArgs(args) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.length === 3 && process.argv[2] === "--help") {
     console.log(
-      "Usage: node scripts/visual-qa/check.mjs --input manifest.json [--live] [--provider openai-decisions]\nOffline by default. Live uploads the explicit screenshot for one advisory API request.",
+      "Usage: node --experimental-strip-types scripts/visual-qa/check.mts --input manifest.json [--live] [--provider openai-decisions]\nOffline by default. Live uploads the explicit screenshot for one advisory API request.",
     );
   } else {
     let outcome;

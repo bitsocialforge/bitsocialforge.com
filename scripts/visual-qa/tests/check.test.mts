@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { run, loadInput, imageMetadata, LIMITS, parseArgs } from "../check.mjs";
+import { run, loadInput, imageMetadata, LIMITS, parseArgs } from "../check.mts";
 import {
   ENDPOINT,
   MODEL,
@@ -21,7 +21,7 @@ import {
   parseDecision,
   resolveSettings,
   readLocalFile,
-} from "../decisions.mjs";
+} from "../decisions.mts";
 
 const KEY = "sk-visual-qa-fake-fixture-key-123456";
 const png = Buffer.from(
@@ -31,7 +31,7 @@ const png = Buffer.from(
 const checks = [{ id: "heading", criterion: "A page heading is visible." }];
 const env = { OPENAI_API_KEY: KEY };
 
-function fixture(t) {
+function fixture(t: TestContext) {
   const directory = mkdtempSync(path.join(realpathSync(tmpdir()), "visual-qa-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const image = path.join(directory, "screen.png");
@@ -51,7 +51,7 @@ const answer = (id = "heading", choice = "satisfies", confidence = 0.98) => ({
     probability: value === choice ? 0.98 : 0.01,
   })),
 });
-const data = (answers = [answer()]) => ({
+const data = (answers: unknown[] = [answer()]) => ({
   model: MODEL,
   answers,
   usage: { input_tokens: 200, output_tokens: 0, total_tokens: 200 },
@@ -81,6 +81,7 @@ test("offline validates provenance without touching credentials, config or netwo
   assert.equal(outcome.report.status, "offline_validated");
   assert.equal(outcome.report.networkCalls, 0);
   assert.equal(outcome.report.advisory, true);
+  assert.ok(outcome.report.input);
   assert.match(outcome.report.input.screenshotSha256, /^[a-f0-9]{64}$/u);
   assert.equal(outcome.report.input.bytes, png.length);
   assert.equal(outcome.report.estimatedInputCostUsd, null);
@@ -88,11 +89,12 @@ test("offline validates provenance without touching credentials, config or netwo
 
 test("CLI defaults offline and rejects malformed or duplicate flags without raw errors", (t) => {
   const f = fixture(t);
-  const executable = fileURLToPath(new URL("../check.mjs", import.meta.url));
-  const out = spawnSync(process.execPath, [executable, "--input", f.input], {
-    encoding: "utf8",
-    env: { ...process.env, OPENAI_API_KEY_FILE: "/missing" },
-  });
+  const executable = fileURLToPath(new URL("../check.mts", import.meta.url));
+  const out = spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", executable, "--input", f.input],
+    { encoding: "utf8", env: { ...process.env, OPENAI_API_KEY_FILE: "/missing" } },
+  );
   assert.equal(out.status, 0, out.stderr);
   assert.equal(JSON.parse(out.stdout).status, "offline_validated");
   assert.deepEqual(parseArgs(["--input", f.input, "--live", "--provider", "openai-decisions"]), {
@@ -176,7 +178,7 @@ test("one call can retain a refusal alongside a valid independent answer", () =>
     ...checks,
     { id: "footer" },
   ]);
-  assert.equal(result.results[0].status, "satisfies");
+  assert.equal(result.results[0]?.status, "satisfies");
   assert.deepEqual(result.results[1], {
     id: "footer",
     status: "unavailable",
@@ -260,9 +262,9 @@ test("network, HTTP, redirect, invalid JSON and oversized responses fail once wi
       { input: f.input, live: true },
       {
         env,
-        fetchImpl: (...args) => {
+        fetchImpl: () => {
           calls++;
-          return fetcher(...args);
+          return fetcher();
         },
       },
     );
@@ -276,8 +278,8 @@ test("network, HTTP, redirect, invalid JSON and oversized responses fail once wi
 
 test("deadline aborts even an uncooperative fetch without a retry", async (t) => {
   const f = fixture(t);
-  let signal,
-    calls = 0;
+  let signal: AbortSignal | undefined;
+  let calls = 0;
   const outcome = await run(
     { input: f.input, live: true },
     {
@@ -291,6 +293,7 @@ test("deadline aborts even an uncooperative fetch without a retry", async (t) =>
     },
   );
   assert.equal(calls, 1);
+  assert.ok(signal);
   assert.equal(signal.aborted, true);
   assert.equal(outcome.report.reason, "deadline_exceeded");
   assert.equal(outcome.exitCode, 2);
@@ -308,7 +311,7 @@ test("deadline also covers a stalled response stream", async (t) => {
 
 test("screenshots or manifests changed during inference invalidate advisory results and retain known usage", async (t) => {
   const f = fixture(t);
-  for (const target of ["image", "input"]) {
+  for (const target of ["image", "input"] as const) {
     writeFileSync(f.image, png);
     writeFileSync(f.input, JSON.stringify(f.manifest));
     const outcome = await run(
@@ -401,7 +404,7 @@ test("byte, pixel, dimension and image-format bounds are enforced before upload"
     [0, 1],
     [4097, 1],
     [2001, 2000],
-  ]) {
+  ] as const) {
     const changed = Buffer.from(png);
     changed.writeUInt32BE(width, 16);
     changed.writeUInt32BE(height, 20);
@@ -412,7 +415,7 @@ test("byte, pixel, dimension and image-format bounds are enforced before upload"
     [png, "screen.jpg"],
     [Buffer.from("not an image"), "screen.png"],
     [png.subarray(0, 40), "screen.png"],
-  ])
+  ] as const)
     assert.throws(() => imageMetadata(bytes, filename));
 });
 
@@ -458,7 +461,7 @@ test("ambiguous, invalid, oversized and symlink credential files fail safely", (
     writeFileSync(keyFile, raw, { mode: 0o600 });
     assert.throws(
       () => resolveSettings({ env: { OPENAI_API_KEY_FILE: keyFile } }),
-      (error) => !error.message.includes(KEY),
+      (error: unknown) => error instanceof Error && !error.message.includes(KEY),
     );
   }
   symlinkSync(keyFile, path.join(f.directory, "link.txt"));
