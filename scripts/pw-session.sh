@@ -65,6 +65,7 @@ owner_file="$lock_dir/owner"
 started_file="$lock_dir/started-at"
 workspace_file="$lock_dir/workspace"
 pid_file="$lock_dir/pid"
+reclaim_marker="$lock_dir/reclaiming"
 default_wait_seconds=300
 poll_seconds="${PW_SESSION_POLL_SECONDS:-5}"
 
@@ -231,19 +232,47 @@ print_status() {
   esac
 }
 
-# Atomically drop a lock we have confirmed is stale. Renaming first means only
-# one racing reclaimer can win, so a concurrent fresh lock is never deleted.
-reclaim_stale_lock() {
-  local owner="$1" staged="${lock_dir}.stale.$$"
+# Clears the marker of a reclaimer that was killed before removing it. A marker
+# with no PID recorded after a short grace lost its reclaimer between the two.
+clear_dead_reclaimer() {
+  local reclaimer
 
-  if mv "$lock_dir" "$staged" 2>/dev/null; then
+  [ -d "$reclaim_marker" ] || return 0
+  reclaimer="$(sed -n '1p' "$reclaim_marker/pid" 2>/dev/null || true)"
+  if [ -z "$reclaimer" ]; then
+    sleep 0.2
+    reclaimer="$(sed -n '1p' "$reclaim_marker/pid" 2>/dev/null || true)"
+  fi
+  if [ -z "$reclaimer" ] || { [[ "$reclaimer" =~ ^[0-9]+$ ]] && ! kill -0 "$reclaimer" 2>/dev/null; }; then
+    rm -rf "$reclaim_marker"
+  fi
+}
+
+# Atomically drop a lock we found stale. The liveness query behind that finding
+# is slow, so the lock may since have been reclaimed and re-acquired, or its
+# holder may have started closing. The marker directory inside the lock lets
+# only one opener reclaim it, and the lock is renamed away only while it is
+# still the acquisition that was examined.
+reclaim_stale_lock() {
+  local owner="$1" examined="$2" staged="${lock_dir}.stale.$$"
+
+  if ! mkdir "$reclaim_marker" 2>/dev/null; then
+    # Another opener is reclaiming it; clear its marker only if it died.
+    clear_dead_reclaimer
+    return 0
+  fi
+  printf '%s\n' "$$" >"$reclaim_marker/pid" 2>/dev/null || true
+
+  if [ "$(lock_generation)" = "$examined" ] && mv "$lock_dir" "$staged" 2>/dev/null; then
     rm -rf "$staged"
     echo "pw-session: reclaimed stale slot from '$owner' (its browser is no longer running)" >&2
+  else
+    rm -rf "$reclaim_marker"
   fi
 }
 
 acquire() {
-  local session="$1" wait_seconds="$2" owner state reclaims=0 empty_waits=0
+  local session="$1" wait_seconds="$2" examined owner state reclaims=0 empty_waits=0
 
   validate_session "$session"
   mkdir -p "$(dirname "$lock_dir")"
@@ -256,7 +285,8 @@ acquire() {
       return 0
     fi
 
-    if [ -z "$(lock_generation)" ] && [ "$empty_waits" -lt 1 ]; then
+    examined="$(lock_generation)"
+    if [ -z "$examined" ] && [ "$empty_waits" -lt 1 ]; then
       # A lock with nothing recorded yet may have just been created.
       empty_waits=1
       sleep 0.2
@@ -268,7 +298,7 @@ acquire() {
     # Bounded so an unremovable lock directory fails loudly instead of spinning.
     if [ "$state" = dead ] && [ "$reclaims" -lt 3 ]; then
       reclaims=$((reclaims + 1))
-      reclaim_stale_lock "${owner:-unknown}"
+      reclaim_stale_lock "${owner:-unknown}" "$examined"
       continue
     fi
 
@@ -313,6 +343,7 @@ release() {
   fi
 
   rm -f "$owner_file" "$started_file" "$workspace_file" "$pid_file"
+  clear_dead_reclaimer
   rmdir "$lock_dir"
   echo "pw-session: released browser slot for '$session'"
 }
