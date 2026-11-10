@@ -31,7 +31,7 @@ if (command === portlessBin) {
     console.log(`Starting Portless dev server at ${publicUrl}`);
   }
 } else {
-  const port = await resolvePort(fallbackRequestedPort);
+  const port = await resolvePort(fallbackRequestedPort, fallbackHost);
   const fallbackUrl = `http://${fallbackUrlHost}:${port}`;
 
   args = ["--host", fallbackHost, "--port", String(port), "--strictPort"];
