@@ -10,6 +10,7 @@ export function MobileMenu({ isOpen, children, onTransitionEnd }: MobileMenuProp
   return (
     <div
       className={`mobile-menu${isOpen ? " is-open" : ""}`}
+      inert={!isOpen}
       onTransitionEnd={(event) => {
         if (event.propertyName !== "grid-template-rows" || isOpen) {
           return;
