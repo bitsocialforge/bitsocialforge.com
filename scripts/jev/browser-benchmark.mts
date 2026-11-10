@@ -9,10 +9,10 @@ import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import type { Execute } from "./browser-playwright.mts";
 import type { BrowserClient, BrowserDriver } from "./browser-plan.mts";
-import type { JevClient } from "./client.mts";
+import type { JevClient, JevRequest, Questions } from "./client.mts";
 import { closeBrowserOnSignal, createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
 import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
-import { createJevClient } from "./client.mts";
+import { createJevClient, JevError } from "./client.mts";
 
 const execute = promisify(execFile);
 export async function readBenchmarkPlan(file: string): Promise<unknown> {
@@ -243,16 +243,39 @@ export async function main(argv = process.argv.slice(2)) {
   if (typeof oldDriver.createPlaywrightDriver !== 'function' || typeof oldPlan.runBrowserPlan !== 'function') throw new Error('invalid_baseline_module');
   const cli = await findPlaywrightCli();
   process.env.PLAYWRIGHT_CLI_BIN = cli;
-  const client = values.jev
+  const clientDeadlineMs = 600_000;
+  const clientStarted = Date.now();
+  const sharedClient = values.jev
     ? createJevClient({
         live: true,
         maxRequests,
         maxCostUsd,
         maxInputTokens: 450_000,
-        deadlineMs: 600_000,
+        deadlineMs: clientDeadlineMs,
       })
     : undefined;
-  const model = client?.assertReady().model ?? null;
+  const model = sharedClient?.assertReady().model ?? null;
+  // The shared client's budget and deadline never recover. Once it cannot answer, every later
+  // run could only launch a browser to fail at its first model request, so the benchmark stops.
+  let clientUnavailable: string | undefined;
+  const client: JevClient | undefined = sharedClient && {
+    ...sharedClient,
+    async ask<Q extends Questions>(request: JevRequest<Q>) {
+      try {
+        return await sharedClient.ask(request);
+      } catch (error) {
+        if (error instanceof JevError && ["budget_exhausted", "deadline_exceeded"].includes(error.code))
+          clientUnavailable = error.code;
+        throw error;
+      }
+    },
+  };
+  const clientStopReason = () => {
+    if (!sharedClient) return undefined;
+    if (clientUnavailable) return clientUnavailable;
+    if (Date.now() - clientStarted >= clientDeadlineMs) return "deadline_exceeded";
+    return sharedClient.stats().requests >= maxRequests ? "budget_exhausted" : undefined;
+  };
   let activeDriver: BrowserDriver | undefined;
   const tracked =
     (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
@@ -290,7 +313,8 @@ export async function main(argv = process.argv.slice(2)) {
       for (let sample = -warmups; sample < samples; sample++) {
         const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
         for (const transport of order) {
-          if (interrupted) return stop(interrupted);
+          const reason = interrupted ?? clientStopReason();
+          if (reason) return stop(reason);
           const result = await benchmarkRun(entry.plan, {
             ...variants[transport],
             client,

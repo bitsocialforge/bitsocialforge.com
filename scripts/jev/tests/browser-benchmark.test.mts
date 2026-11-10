@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { summarizePairs, main, readBenchmarkPlan } from "../browser-benchmark.mts";
 import type { BenchmarkPairRun } from "../browser-benchmark.mts";
-import { required } from "./helpers.mts";
+import { record, required } from "./helpers.mts";
+import { createFakePlaywright, fixturePlan, repoRoot } from "./fake-playwright.mts";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -68,5 +69,62 @@ test("plan reader is bounded and refuses non-files and symlinks before browser e
     await assert.rejects(readBenchmarkPlan(file), /invalid_benchmark_plan/);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("live Jev benchmark stops launching browsers once its shared client can no longer answer", async () => {
+  const fake = await createFakePlaywright();
+  const names = [
+    "PLAYWRIGHT_CLI_BIN",
+    "PLAYWRIGHT_RESOURCE_LOCK_DIR",
+    "FAKE_PW_STATE",
+    "TYPESAFE_API_KEY",
+    "JEV_MODEL",
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const { fetch } = globalThis;
+  const { log, error } = console;
+  const output: string[] = [];
+  try {
+    const env = fake.env({ TYPESAFE_API_KEY: "fixture-key", JEV_MODEL: "jev-1.13.0" });
+    for (const name of names) process.env[name] = env[name];
+    globalThis.fetch = async () => {
+      throw new Error("the exhausted budget must stop requests before the provider");
+    };
+    console.log = (line: unknown) => output.push(String(line));
+    console.error = () => {};
+    const plan = path.join(fake.root, "plan.json");
+    await fs.writeFile(plan, JSON.stringify(fixturePlan()));
+    // The first model request already exceeds this budget, so every later run would fail too.
+    const code = await main([
+      "--plan",
+      plan,
+      "--baseline-root",
+      repoRoot,
+      "--live",
+      "--jev",
+      "--samples",
+      "2",
+      "--warmups",
+      "0",
+      "--max-cost-usd",
+      "0.0000001",
+    ]);
+    assert.equal(code, 2);
+    const report = record(JSON.parse(output.join("\n")));
+    assert.equal(report.interrupted, "budget_exhausted");
+    assert.ok(Array.isArray(report.runs));
+    assert.equal(report.runs.length, 1);
+    assert.equal(record(report.runs[0]).reason, "budget_exhausted");
+    assert.equal(await fake.commands("open"), 1);
+    assert.deepEqual(await fake.openBrowsers(), []);
+  } finally {
+    globalThis.fetch = fetch;
+    Object.assign(console, { log, error });
+    for (const name of names) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
+    await fake.cleanup();
   }
 });
