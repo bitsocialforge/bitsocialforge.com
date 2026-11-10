@@ -84,6 +84,10 @@ export function createPlaywrightDriver({ execute = exec }: { execute?: Execute }
   let started: number;
   let combinedObservation = false;
   let opening = false;
+  let closing: Promise<void> | undefined;
+  // Aborted by close() so a command still running when a run is interrupted stops before the
+  // browser closes; an aborted wrapper open stops its own launch before releasing the slot.
+  const running = new AbortController();
   const childEnv = { ...process.env };
   delete childEnv.TYPESAFE_API_KEY;
   delete childEnv.TYPESAFE_API_KEY_FILE;
@@ -98,6 +102,7 @@ export function createPlaywrightDriver({ execute = exec }: { execute?: Execute }
         env: { ...childEnv, PLAYWRIGHT_CLI_BIN: cli },
         timeout: Math.min(remaining, 30_000),
         maxBuffer: 512_000,
+        ...(cleanup ? {} : { signal: running.signal }),
       });
       if (
         cleanup &&
@@ -236,12 +241,38 @@ export function createPlaywrightDriver({ execute = exec }: { execute?: Execute }
     async reload() {
       await code(`${guard()} await page.reload({waitUntil: 'domcontentloaded'}); return true;`);
     },
-    async close() {
-      try {
-        if (opening) await command(["close", session], true, true);
-      } finally {
-        if (directory) await rm(directory, { recursive: true, force: true });
-      }
+    close() {
+      // A signal handler and the interrupted run's own cleanup may both close the driver.
+      closing ??= (async () => {
+        running.abort();
+        try {
+          if (opening) await command(["close", session], true, true);
+        } finally {
+          if (directory) await rm(directory, { recursive: true, force: true });
+        }
+      })();
+      return closing;
     },
   };
+}
+
+const interruptSignals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+
+// A signal's default action skips every `finally`, leaving the run's browser open and the
+// machine-wide slot held by a session nobody will close. The first signal closes the active
+// driver at once and lets the run unwind; a second one exits immediately.
+export function closeBrowserOnSignal(
+  activeDriver: () => BrowserDriver | undefined,
+  onSignal: (signal: NodeJS.Signals) => void,
+) {
+  const remove = () => {
+    for (const name of interruptSignals) process.off(name, handle);
+  };
+  function handle(signal: NodeJS.Signals) {
+    remove();
+    onSignal(signal);
+    activeDriver()?.close().catch(() => {});
+  }
+  for (const name of interruptSignals) process.on(name, handle);
+  return remove;
 }

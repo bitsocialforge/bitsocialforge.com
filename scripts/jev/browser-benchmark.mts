@@ -8,9 +8,9 @@ import { parseArgs, promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import type { Execute } from "./browser-playwright.mts";
-import type { BrowserClient } from "./browser-plan.mts";
+import type { BrowserClient, BrowserDriver } from "./browser-plan.mts";
 import type { JevClient } from "./client.mts";
-import { createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
+import { closeBrowserOnSignal, createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
 import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
 import { createJevClient } from "./client.mts";
 
@@ -253,60 +253,80 @@ export async function main(argv = process.argv.slice(2)) {
       })
     : undefined;
   const model = client?.assertReady().model ?? null;
+  let activeDriver: BrowserDriver | undefined;
+  const tracked =
+    (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
+    (options) =>
+      (activeDriver = create(options));
   const variants = {
-    old: { createDriver: oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver, runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
-    combined: { createDriver: createPlaywrightDriver, runPlan: runBrowserPlan },
+    old: { createDriver: tracked(oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver), runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
+    combined: { createDriver: tracked(createPlaywrightDriver), runPlan: runBrowserPlan },
   };
-  const runs = [];
-  for (const entry of plans)
-    for (let sample = -warmups; sample < samples; sample++) {
-      const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
-      for (const transport of order) {
-        const result = await benchmarkRun(entry.plan, {
-          ...variants[transport],
-          client,
-          baseline: !values.jev,
-        });
-        const run = {
-          case: entry.id,
-          plan: entry.file,
-          sample: Math.max(sample, 0),
-          warmup: sample < 0,
-          evidence: values.evidence,
-          mode: values.jev ? "jev" : "deterministic",
-          transport,
-          ...result,
-        };
-        runs.push(run);
-        console.error(
-          JSON.stringify({
-            case: run.case,
-            sample,
+  const runs: BenchmarkPairRun[] = [];
+  const stop = (reason: string) => {
+    console.log(
+      JSON.stringify(
+        {
+          runs,
+          summary: summarizePairs(runs),
+          interrupted: reason,
+          usage: client?.stats() || null,
+        },
+        null,
+        2,
+      ),
+    );
+    return 2;
+  };
+  let interrupted: string | undefined;
+  const removeSignalHandlers = closeBrowserOnSignal(
+    () => activeDriver,
+    (signal) => {
+      interrupted = signal;
+    },
+  );
+  try {
+    for (const entry of plans)
+      for (let sample = -warmups; sample < samples; sample++) {
+        const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
+        for (const transport of order) {
+          if (interrupted) return stop(interrupted);
+          const result = await benchmarkRun(entry.plan, {
+            ...variants[transport],
+            client,
+            baseline: !values.jev,
+          });
+          activeDriver = undefined;
+          const run = {
+            case: entry.id,
+            plan: entry.file,
+            sample: Math.max(sample, 0),
+            warmup: sample < 0,
+            evidence: values.evidence,
+            mode: values.jev ? "jev" : "deterministic",
             transport,
-            status: run.status,
-            reason: run.reason,
-            adapterMode: run.adapterMode,
-            lifecycleMs: Math.round(run.lifecycleMs),
-            controlCalls: run.controlCalls,
-          }),
-        );
-        if (["browser_slot_busy", "cleanup_failed"].includes(run.reason)) {
-          console.log(
-            JSON.stringify(
-              {
-                runs,
-                summary: summarizePairs(runs),
-                interrupted: run.reason,
-                usage: client?.stats() || null,
-              },
-              null,
-              2,
-            ),
+            ...result,
+          };
+          runs.push(run);
+          console.error(
+            JSON.stringify({
+              case: run.case,
+              sample,
+              transport,
+              status: run.status,
+              reason: run.reason,
+              adapterMode: run.adapterMode,
+              lifecycleMs: Math.round(run.lifecycleMs),
+              controlCalls: run.controlCalls,
+            }),
           );
-          return 2;
+          if (["browser_slot_busy", "cleanup_failed"].includes(run.reason)) return stop(run.reason);
         }
       }
-    }
+    if (interrupted) return stop(interrupted);
+  } finally {
+    removeSignalHandlers();
+  }
   console.log(
     JSON.stringify(
       {

@@ -5,7 +5,7 @@ import path from "node:path";
 import { createJevClient, JevError } from "./client.mts";
 import { redactJevSecrets } from "./config.mts";
 import { validatePlan, runBrowserPlan } from "./browser-plan.mts";
-import { createPlaywrightDriver } from "./browser-playwright.mts";
+import { closeBrowserOnSignal, createPlaywrightDriver } from "./browser-playwright.mts";
 
 export async function main(args = process.argv.slice(2)) {
   if (!args.length || args.includes("--help")) {
@@ -65,11 +65,27 @@ export async function main(args = process.argv.slice(2)) {
           maxInputBytes: Math.min(128_000, plan.limits.maxSnapshotBytes + 30_000),
         });
     client?.assertReady();
-    const result = await runBrowserPlan(rawPlan, {
-      driver: createPlaywrightDriver(),
-      client,
-      baseline: !!options["--baseline"],
-    });
+    const driver = createPlaywrightDriver();
+    let interrupted = false;
+    const removeSignalHandlers = closeBrowserOnSignal(
+      () => driver,
+      () => {
+        interrupted = true;
+      },
+    );
+    let result;
+    try {
+      result = await runBrowserPlan(rawPlan, {
+        driver,
+        client,
+        baseline: !!options["--baseline"],
+      });
+    } finally {
+      removeSignalHandlers();
+    }
+    // An interrupted run never reports success; a failed cleanup keeps its own reason.
+    if (interrupted && result.reason !== "cleanup_failed")
+      result = { ...result, status: "incomplete", reason: "interrupted" };
     process.stdout.write(JSON.stringify({ ...result, plan: planReference() }) + "\n");
     return result.status === "completed" ? 0 : 2;
   } catch (error) {
