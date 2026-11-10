@@ -151,7 +151,6 @@ export function Topbar() {
   useEffect(() => {
     if (!usesCompactNavigation) {
       setIsMobileMenuOpen(false);
-      setIsMenuExpanded(false);
     }
   }, [usesCompactNavigation]);
 
