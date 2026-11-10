@@ -40,9 +40,11 @@ One browser slot is shared by every worktree and repository on this machine.
            A slot whose browser is gone is reclaimed automatically.
   close    Stop the named browser, then release the slot. Always attempts the
            browser close, even when the lock was already lost, and never
-           releases a slot held by a different session.
+           releases a slot held by a different session. A same-named session
+           that another workspace holds is left running and keeps the slot.
   status   Report the holder and whether its browser is still running.
   release  Drop a lock without closing a browser. Normal cleanup uses `close`.
+           Only the workspace that opened the session can release it.
 EOF
 }
 
@@ -69,7 +71,8 @@ reclaim_marker="$lock_dir/reclaiming"
 default_wait_seconds=300
 poll_seconds="${PW_SESSION_POLL_SECONDS:-5}"
 
-# Recorded for diagnostics only: the lock is machine-wide, so a checkout outside
+# Recorded with the lock so close and release can refuse a same-named session
+# that another workspace holds. The lock is machine-wide, so a checkout outside
 # a Git worktree is unusual but not an error.
 workspace="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
@@ -126,6 +129,18 @@ session_state() {
   done <<<"$listing"
 
   echo dead
+}
+
+held_workspace() {
+  sed -n '1p' "$workspace_file" 2>/dev/null || true
+}
+
+# A same-named session opened from another workspace is a different holder. A
+# lock without a record, or whose workspace no longer exists, is not refused.
+held_from_here() {
+  local held
+  held="$(held_workspace)"
+  [ -z "$held" ] || [ "$held" = "$workspace" ] || [ ! -d "$held" ]
 }
 
 # Marks this wrapper as starting or stopping the slot's browser.
@@ -190,7 +205,7 @@ write_lock_metadata() {
 }
 
 print_status() {
-  local owner started held_workspace state
+  local owner started held state
 
   if [ ! -d "$lock_dir" ]; then
     echo "pw-session: browser slot is available"
@@ -199,7 +214,7 @@ print_status() {
 
   owner="$(current_owner)"
   started="$(sed -n '1p' "$started_file" 2>/dev/null || true)"
-  held_workspace="$(sed -n '1p' "$workspace_file" 2>/dev/null || true)"
+  held="$(held_workspace)"
   if [ -n "$owner" ]; then
     state="$(holder_state "$owner")"
   elif transition_alive; then
@@ -217,7 +232,7 @@ print_status() {
 
   echo "Session: ${owner:-unknown}"
   echo "Started: ${started:-unknown}"
-  echo "Workspace: ${held_workspace:-unknown}"
+  echo "Workspace: ${held:-unknown}"
   echo "Lock: $lock_dir"
 
   case "$state" in
@@ -341,6 +356,10 @@ release() {
     fi
     return 1
   fi
+  if ! held_from_here; then
+    echo "pw-session: '$session' holds the slot from $(held_workspace), not this workspace; cannot release it here" >&2
+    return 1
+  fi
 
   rm -f "$owner_file" "$started_file" "$workspace_file" "$pid_file"
   clear_dead_reclaimer
@@ -407,11 +426,15 @@ case "$command" in
     validate_session "$session"
 
     owner="$(current_owner)"
-    if [ "$owner" = "$session" ]; then
+    if [ "$owner" = "$session" ] && held_from_here; then
       # An open of this session that is still starting would bring its browser
       # up after this close, so let it finish or abort first.
       wait_for_transition "$session"
       owner="$(current_owner)"
+    fi
+    if [ "$owner" = "$session" ] && ! held_from_here; then
+      echo "pw-session: '$session' holds the slot from $(held_workspace), not this workspace; left its browser and the slot untouched" >&2
+      exit 1
     fi
     if [ "$owner" = "$session" ]; then
       # Keeps the slot held while the browser stops and is no longer listed open.

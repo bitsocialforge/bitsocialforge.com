@@ -156,3 +156,33 @@ test("a reclaimer killed mid-reclaim blocks neither the holder's close nor a lat
     await fake.cleanup();
   }
 });
+
+test("a same-named session from another workspace can neither close nor release the holder", async () => {
+  const fake = await createFakePlaywright();
+  try {
+    const holderCheckout = path.join(fake.root, "checkout-a");
+    const otherCheckout = path.join(fake.root, "checkout-b");
+    await mkdir(holderCheckout);
+    await mkdir(otherCheckout);
+    const opened = await fake.session(["open", "site-check", "about:blank"], {
+      cwd: holderCheckout,
+    }).exit;
+    assert.equal(opened.code, 0, opened.stderr);
+    const busy = await fake.session(["open", "site-check", "about:blank"], { cwd: otherCheckout })
+      .exit;
+    assert.equal(busy.code, 75, busy.stderr);
+    for (const command of ["close", "release"]) {
+      const refused = await fake.session([command, "site-check"], { cwd: otherCheckout }).exit;
+      assert.equal(refused.code, 1, `${command}: ${refused.stderr}`);
+      assert.match(refused.stderr, /not this workspace/);
+    }
+    assert.deepEqual(await fake.openBrowsers(), ["site-check"]);
+    assert.equal(await holder(fake.lock), "site-check");
+    const closed = await fake.session(["close", "site-check"], { cwd: holderCheckout }).exit;
+    assert.equal(closed.code, 0, closed.stderr);
+    assert.deepEqual(await fake.openBrowsers(), []);
+    await assert.rejects(access(fake.lock));
+  } finally {
+    await fake.cleanup();
+  }
+});
