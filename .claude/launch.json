@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "bitsocialforge",
-      "runtimeExecutable": "corepack",
-      "runtimeArgs": ["yarn", "start"],
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORTLESS=0", "corepack", "yarn", "start"],
       "port": 4173
     }
   ]
