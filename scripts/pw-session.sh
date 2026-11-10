@@ -367,6 +367,31 @@ release() {
   echo "pw-session: released browser slot for '$session'"
 }
 
+# A signal while the browser is starting: stop the launch, close anything that
+# already came up, and only then release the slot.
+abort_open() {
+  local status="$1" waited=0
+
+  trap '' INT TERM HUP PIPE
+  set +e
+  # The caller may have closed its end of our output pipes (Node's execFile does
+  # on timeout), and bash would keep the unwritten text and flush it into the
+  # next file it writes. Only a terminal still gets the final message.
+  exec >/dev/null
+  [ -t 2 ] || exec 2>/dev/null
+  if [ -n "$open_pid" ]; then
+    kill -TERM "$open_pid" 2>/dev/null
+    while kill -0 "$open_pid" 2>/dev/null && [ "$waited" -lt 100 ]; do
+      sleep 0.1
+      waited=$((waited + 1))
+    done
+  fi
+  "$playwright_cli" -s="$session" close >/dev/null 2>&1
+  release "$session"
+  echo "pw-session: interrupted while opening '$session'; stopped it and released the slot" >&2
+  exit "$status"
+}
+
 command="${1:-}"
 case "$command" in
   open)
@@ -408,9 +433,20 @@ case "$command" in
     fi
 
     acquire "$session" "$wait_seconds"
-    # Guarded expansion: Bash 3.2 (macOS /bin/bash) errors on an empty array
-    # under `set -u`.
-    if ! "$playwright_cli" -s="$session" open ${open_args[@]+"${open_args[@]}"}; then
+    open_pid=''
+    trap 'abort_open 130' INT
+    trap 'abort_open 143' TERM
+    trap 'abort_open 129' HUP
+    # Run in the background so a signal reaches the trap during the launch: a
+    # caller that kills only this wrapper (Node's execFile timeout does) would
+    # otherwise leave the launch running after the slot is released. Guarded
+    # expansion: Bash 3.2 (macOS /bin/bash) errors on an empty array under `set -u`.
+    "$playwright_cli" -s="$session" open ${open_args[@]+"${open_args[@]}"} &
+    open_pid=$!
+    open_status=0
+    wait "$open_pid" || open_status=$?
+    trap - INT TERM HUP
+    if [ "$open_status" -ne 0 ]; then
       release "$session"
       exit 1
     fi
