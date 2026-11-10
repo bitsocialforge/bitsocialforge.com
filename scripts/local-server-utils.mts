@@ -24,6 +24,12 @@ export const portlessEnv = {
   PORTLESS_LAN: process.env.PORTLESS_LAN ?? "0",
 };
 
+export function getPortlessPublicUrl(appName: string, proxyPort = portlessProxyPort) {
+  const portSuffix = proxyPort === "443" ? "" : `:${proxyPort}`;
+
+  return `https://${appName}.localhost${portSuffix}`;
+}
+
 export function getLocalServerCommand() {
   return usePortless && existsSync(portlessBin) ? portlessBin : viteBin;
 }

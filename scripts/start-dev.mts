@@ -7,6 +7,7 @@ import {
   forwardChildExit,
   getLocalServerCommand,
   getPortlessAppName,
+  getPortlessPublicUrl,
   openInBrowser,
   portlessBin,
   portlessEnv,
@@ -24,7 +25,7 @@ if (command === portlessBin) {
   ensurePortlessProxy();
   const appName = getPortlessAppName();
 
-  publicUrl = `https://${appName}.localhost`;
+  publicUrl = getPortlessPublicUrl(appName);
   args = [appName, "vite"];
 
   if (appName !== portlessBaseName) {
