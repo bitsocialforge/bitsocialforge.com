@@ -8,7 +8,7 @@ import { parseArgs, promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import type { Execute } from "./browser-playwright.mts";
-import type { BrowserClient, BrowserDriver } from "./browser-plan.mts";
+import type { BrowserClient, BrowserDriver, BrowserPlan } from "./browser-plan.mts";
 import type { JevClient, JevRequest, Questions } from "./client.mts";
 import { closeBrowserOnSignal, createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
 import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
@@ -281,8 +281,26 @@ export async function main(argv = process.argv.slice(2)) {
     (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
     (options) =>
       (activeDriver = create(options));
+  // A retained baseline driver and wrapper may predate interruptible opens: closing them while
+  // the browser is still starting releases the slot and lets the launch finish unowned, and a
+  // second close then fails. Close the baseline driver once, after its open has settled.
+  const trackedBaseline =
+    (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
+    (options) => {
+      const driver = create(options);
+      let opened: Promise<void> = Promise.resolve();
+      let closing: Promise<void> | undefined;
+      return (activeDriver = new Proxy(driver, {
+        get(target, key) {
+          if (key === "open") return (plan: BrowserPlan) => (opened = target.open(plan));
+          if (key === "close")
+            return () => (closing ??= opened.then(() => target.close(), () => target.close()));
+          return Reflect.get(target, key);
+        },
+      }));
+    };
   const variants = {
-    old: { createDriver: tracked(oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver), runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
+    old: { createDriver: trackedBaseline(oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver), runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
     combined: { createDriver: tracked(createPlaywrightDriver), runPlan: runBrowserPlan },
   };
   const runs: BenchmarkPairRun[] = [];
