@@ -34,6 +34,10 @@ async function waitForExit(pid: number, timeoutMs: number) {
   return !isRunning(pid);
 }
 
+// Windows has no POSIX signals: killing the launcher there ends it without
+// running its handlers, so these cases only hold on macOS and Linux.
+const posixSignalsSkip = process.platform === "win32" && "Windows does not deliver POSIX signals";
+
 // portless only stops its detached app on SIGINT and SIGTERM, so a hangup must
 // reach the child as SIGTERM. The plain child here dies of whatever signal it
 // gets and the launcher re-raises it, so the launcher's exit signal shows it.
@@ -44,7 +48,7 @@ for (const [signal, forwardedSignal] of [
 ] as const) {
   test(
     `forwardChildExit stops the child when only the launcher receives ${signal}`,
-    { timeout: 15_000 },
+    { timeout: 15_000, skip: posixSignalsSkip },
     async (t) => {
       const launcher = spawn(
         process.execPath,
