@@ -156,6 +156,12 @@ export function createPlaywrightDriver({ execute = exec }: { execute?: Execute }
         }),
         { mode: 0o600 },
       );
+      // close() can run while the awaits above are pending, before there is a launch to stop or a
+      // directory to remove. Stop here rather than start a browser that nothing will close.
+      if (running.signal.aborted) {
+        await rm(directory, { recursive: true, force: true });
+        throw new JevError("interrupted");
+      }
       opening = true;
       // Start blank so navigation guards exist before the plan URL is visited.
       await command(

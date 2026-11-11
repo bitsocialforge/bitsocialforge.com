@@ -1,11 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { runBrowserPlan } from "../browser-plan.mts";
+import { runBrowserPlan, validatePlan } from "../browser-plan.mts";
 import { createPlaywrightDriver } from "../browser-playwright.mts";
 import { createFakePlaywright, fixturePlan, repoRoot, start } from "./fake-playwright.mts";
 import { record } from "./helpers.mts";
+
+test("a close during an open's setup stops that open before it starts a browser or leaves its directory", async () => {
+  const previous = process.env.TMPDIR;
+  const temp = await mkdtemp(path.join(tmpdir(), "jev-open-setup-"));
+  const commands: string[][] = [];
+  try {
+    process.env.TMPDIR = temp;
+    const driver = createPlaywrightDriver({
+      execute: async (_file, args) => {
+        commands.push(args);
+        return { stdout: "", stderr: "" };
+      },
+    });
+    const opening = driver.open(validatePlan(fixturePlan()));
+    // A signal can close the driver while open() still awaits its CLI lookup and temp directory.
+    await driver.close();
+    await assert.rejects(opening, { code: "interrupted" });
+    assert.deepEqual(commands, []);
+    assert.deepEqual(await readdir(temp), []);
+  } finally {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+    await rm(temp, { recursive: true, force: true });
+  }
+});
 
 test("an open that times out stops its launch before the slot is released", async () => {
   const fake = await createFakePlaywright();
