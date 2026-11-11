@@ -12,7 +12,7 @@ import type { BrowserClient, BrowserDriver, BrowserPlan } from "./browser-plan.m
 import type { JevClient, JevRequest, Questions } from "./client.mts";
 import { closeBrowserOnSignal, createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
 import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
-import { createJevClient, JevError } from "./client.mts";
+import { createJevClient, INPUT_USD_PER_MILLION, JevError } from "./client.mts";
 
 const execute = promisify(execFile);
 export async function readBenchmarkPlan(file: string): Promise<unknown> {
@@ -244,37 +244,57 @@ export async function main(argv = process.argv.slice(2)) {
   const cli = await findPlaywrightCli();
   process.env.PLAYWRIGHT_CLI_BIN = cli;
   const clientDeadlineMs = 600_000;
+  const maxInputTokens = 450_000;
   const clientStarted = Date.now();
   const sharedClient = values.jev
     ? createJevClient({
         live: true,
         maxRequests,
         maxCostUsd,
-        maxInputTokens: 450_000,
+        maxInputTokens,
         deadlineMs: clientDeadlineMs,
       })
     : undefined;
   const model = sharedClient?.assertReady().model ?? null;
-  // The shared client's budget and deadline never recover. Once it cannot answer, every later
-  // run could only launch a browser to fail at its first model request, so the benchmark stops.
-  let clientUnavailable: string | undefined;
+  // The smallest input-token reserve that a run's first model request has taken, or would have
+  // taken when the budget refused it, so far.
+  let smallestFirstReserve: number | undefined;
+  let runStarting = false;
   const client: JevClient | undefined = sharedClient && {
     ...sharedClient,
     async ask<Q extends Questions>(request: JevRequest<Q>) {
+      const first = runStarting;
+      runStarting = false;
+      const before = sharedClient.stats().reservedInputTokens;
+      let refused: number | undefined;
       try {
         return await sharedClient.ask(request);
       } catch (error) {
-        if (error instanceof JevError && ["budget_exhausted", "deadline_exceeded"].includes(error.code))
-          clientUnavailable = error.code;
+        // A refused request reserves nothing; its error carries the reserve it would have taken.
+        if (error instanceof JevError) refused = error.reserved;
         throw error;
+      } finally {
+        const reserve = refused ?? sharedClient.stats().reservedInputTokens - before;
+        if (first && reserve > 0)
+          smallestFirstReserve = Math.min(smallestFirstReserve ?? reserve, reserve);
       }
     },
   };
+  // The shared client's deadline, request count and token and cost reserve never recover. Once the
+  // next run could only launch a browser to fail at its first model request, the benchmark stops.
+  // The reserve counts as used up when the smallest first request of a run so far, sent or refused,
+  // no longer fits, by the client's own check. A larger request that it refuses fails only its own
+  // run while a smaller first request still fits.
   const clientStopReason = () => {
     if (!sharedClient) return undefined;
-    if (clientUnavailable) return clientUnavailable;
     if (Date.now() - clientStarted >= clientDeadlineMs) return "deadline_exceeded";
-    return sharedClient.stats().requests >= maxRequests ? "budget_exhausted" : undefined;
+    const { requests, reservedInputTokens } = sharedClient.stats();
+    if (requests >= maxRequests) return "budget_exhausted";
+    if (smallestFirstReserve === undefined) return undefined;
+    const reserved = reservedInputTokens + smallestFirstReserve;
+    return reserved > maxInputTokens || (reserved * INPUT_USD_PER_MILLION) / 1e6 > maxCostUsd
+      ? "budget_exhausted"
+      : undefined;
   };
   let activeDriver: BrowserDriver | undefined;
   const tracked =
@@ -333,6 +353,7 @@ export async function main(argv = process.argv.slice(2)) {
         for (const transport of order) {
           const reason = interrupted ?? clientStopReason();
           if (reason) return stop(reason);
+          runStarting = true;
           const result = await benchmarkRun(entry.plan, {
             ...variants[transport],
             client,
