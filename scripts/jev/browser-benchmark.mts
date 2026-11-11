@@ -256,8 +256,8 @@ export async function main(argv = process.argv.slice(2)) {
       })
     : undefined;
   const model = sharedClient?.assertReady().model ?? null;
-  // The smallest input-token reserve that a run's first model request has taken, or would have
-  // taken when the budget refused it, so far.
+  // The smallest input-token reserve that the first model request of a run of the current plan has
+  // taken, or would have taken when the budget refused it, so far.
   let smallestFirstReserve: number | undefined;
   let runStarting = false;
   const client: JevClient | undefined = sharedClient && {
@@ -281,20 +281,22 @@ export async function main(argv = process.argv.slice(2)) {
     },
   };
   // The shared client's deadline, request count and token and cost reserve never recover. Once the
-  // next run could only launch a browser to fail at its first model request, the benchmark stops.
-  // The reserve counts as used up when the smallest first request of a run so far, sent or refused,
-  // no longer fits, by the client's own check. A larger request that it refuses fails only its own
-  // run while a smaller first request still fits.
+  // next run could only launch a browser to fail at its first model request, the benchmark stops
+  // launching it. A used-up deadline or request count stops the benchmark.
   const clientStopReason = () => {
     if (!sharedClient) return undefined;
     if (Date.now() - clientStarted >= clientDeadlineMs) return "deadline_exceeded";
-    const { requests, reservedInputTokens } = sharedClient.stats();
-    if (requests >= maxRequests) return "budget_exhausted";
-    if (smallestFirstReserve === undefined) return undefined;
-    const reserved = reservedInputTokens + smallestFirstReserve;
-    return reserved > maxInputTokens || (reserved * INPUT_USD_PER_MILLION) / 1e6 > maxCostUsd
-      ? "budget_exhausted"
-      : undefined;
+    return sharedClient.stats().requests >= maxRequests ? "budget_exhausted" : undefined;
+  };
+  // The token and cost reserve is used up for the current plan once the smallest first request of
+  // its runs so far, sent or refused, no longer fits, by the client's own check. The benchmark then
+  // skips the plan's remaining runs and moves on to the next plan, whose first request may be
+  // smaller. Until then, a run whose first request is larger than that smallest one, such as the
+  // other transport's, can still launch a browser that the client refuses at its first request.
+  const planFits = () => {
+    if (!sharedClient || smallestFirstReserve === undefined) return true;
+    const reserved = sharedClient.stats().reservedInputTokens + smallestFirstReserve;
+    return reserved <= maxInputTokens && (reserved * INPUT_USD_PER_MILLION) / 1e6 <= maxCostUsd;
   };
   let activeDriver: BrowserDriver | undefined;
   const tracked =
@@ -346,13 +348,19 @@ export async function main(argv = process.argv.slice(2)) {
       interrupted = signal;
     },
   );
+  let exhausted: string | undefined;
   try {
-    for (const entry of plans)
+    for (const entry of plans) {
+      smallestFirstReserve = undefined;
       for (let sample = -warmups; sample < samples; sample++) {
         const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
         for (const transport of order) {
           const reason = interrupted ?? clientStopReason();
           if (reason) return stop(reason);
+          if (!planFits()) {
+            exhausted = "budget_exhausted";
+            continue;
+          }
           runStarting = true;
           const result = await benchmarkRun(entry.plan, {
             ...variants[transport],
@@ -386,7 +394,9 @@ export async function main(argv = process.argv.slice(2)) {
           if (["browser_slot_busy", "cleanup_failed"].includes(run.reason)) return stop(run.reason);
         }
       }
+    }
     if (interrupted) return stop(interrupted);
+    if (exhausted) return stop(exhausted);
   } finally {
     removeSignalHandlers();
   }

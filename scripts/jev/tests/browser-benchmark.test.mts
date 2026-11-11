@@ -227,7 +227,8 @@ test("a request too large for the remaining model budget does not stop later, sm
     const requests = live.requests();
     const opens = await live.fake.commands("open");
     // After the small plan's two requests, room for one more small request, but not for the
-    // large plan's ~2000 extra bytes. The third small request leaves room for none.
+    // large plan's ~2000 extra bytes. Once its first run is refused, the large plan's second run is
+    // skipped. The third small request leaves room for none.
     const { code, report } = await live.run(
       [small, large, later],
       ["--samples", "1", "--max-cost-usd", costBudget(3 * reserve + 1000)],
@@ -241,12 +242,50 @@ test("a request too large for the remaining model budget does not stop later, sm
         ["small.json", "provider_unavailable"],
         ["small.json", "provider_unavailable"],
         ["large.json", "budget_exhausted"],
-        ["large.json", "budget_exhausted"],
         ["later.json", "provider_unavailable"],
       ],
     );
     assert.equal(live.requests() - requests, 3);
-    assert.equal((await live.fake.commands("open")) - opens, 5);
+    assert.equal((await live.fake.commands("open")) - opens, 4);
+    assert.deepEqual(await live.fake.openBrowsers(), []);
+  } finally {
+    await live.restore();
+  }
+});
+
+test("a plan whose first request no longer fits the model budget does not stop a later plan whose first request does", async () => {
+  const live = await liveJevBenchmark();
+  try {
+    const large = path.join(live.fake.root, "large.json");
+    const small = path.join(live.fake.root, "small.json");
+    await fs.writeFile(
+      large,
+      JSON.stringify({ ...fixturePlan(), goal: fixturePlan().goal.padEnd(2000, ".") }),
+    );
+    await fs.writeFile(small, JSON.stringify(fixturePlan()));
+    const largeReserve = await requestReserve(live, large);
+    const smallReserve = await requestReserve(live, small);
+    assert.ok(largeReserve > smallReserve + 1000);
+    const requests = live.requests();
+    const opens = await live.fake.commands("open");
+    // After one large request, room for one small request but not another large one. The small
+    // request then leaves room for none.
+    const { code, report } = await live.run(
+      [large, small],
+      ["--samples", "1", "--max-cost-usd", costBudget(largeReserve + smallReserve + 1000)],
+    );
+    assert.equal(code, 2);
+    assert.equal(report.interrupted, "budget_exhausted");
+    assert.ok(Array.isArray(report.runs));
+    assert.deepEqual(
+      report.runs.map((run) => [record(run).plan, record(run).reason]),
+      [
+        ["large.json", "provider_unavailable"],
+        ["small.json", "provider_unavailable"],
+      ],
+    );
+    assert.equal(live.requests() - requests, 2);
+    assert.equal((await live.fake.commands("open")) - opens, 2);
     assert.deepEqual(await live.fake.openBrowsers(), []);
   } finally {
     await live.restore();
