@@ -5,6 +5,7 @@
       "name": "bitsocialforge",
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["yarn", "start"],
+      "env": { "PORTLESS": "0" },
       "port": 4173
     }
   ]

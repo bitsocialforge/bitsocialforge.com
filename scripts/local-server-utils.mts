@@ -24,6 +24,12 @@ export const portlessEnv = {
   PORTLESS_LAN: process.env.PORTLESS_LAN ?? "0",
 };
 
+export function getPortlessPublicUrl(appName: string, proxyPort = portlessProxyPort) {
+  const portSuffix = proxyPort === "443" ? "" : `:${proxyPort}`;
+
+  return `https://${appName}.localhost${portSuffix}`;
+}
+
 export function getLocalServerCommand() {
   return usePortless && existsSync(portlessBin) ? portlessBin : viteBin;
 }
@@ -159,8 +165,26 @@ export function openInBrowser(url: string) {
   spawn(opener.cmd, opener.args, { stdio: "ignore", detached: true }).unref();
 }
 
+const forwardedSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+
 export function forwardChildExit(child: ChildProcess) {
+  // A signal sent to the launcher alone (`kill <pid>`, or a tool that stops
+  // only the process it started) would otherwise end it and leave the dev
+  // server running. portless only stops its detached app on SIGINT and
+  // SIGTERM, so a hangup goes as SIGTERM.
+  const forwardSignal = (signal: NodeJS.Signals) => {
+    child.kill(signal === "SIGHUP" ? "SIGTERM" : signal);
+  };
+
+  for (const signal of forwardedSignals) {
+    process.on(signal, forwardSignal);
+  }
+
   child.on("exit", (code, signal) => {
+    for (const forwardedSignal of forwardedSignals) {
+      process.off(forwardedSignal, forwardSignal);
+    }
+
     if (signal) {
       process.kill(process.pid, signal);
       return;

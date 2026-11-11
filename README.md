@@ -18,8 +18,13 @@ Sans Mono fonts are self-hosted, with global styling in `styles.css`.
 ```bash
 corepack enable
 corepack yarn install
-corepack yarn start   # http://localhost:4173
+corepack yarn start   # open the URL it prints
 ```
+
+`corepack yarn start` serves the site through portless at
+`https://bitsocialforge.localhost` when portless is available (other branches
+get a branch-named host). `PORTLESS=0 corepack yarn start` runs Vite directly on
+`http://localhost:4173`, or the next free port.
 
 Useful checks:
 

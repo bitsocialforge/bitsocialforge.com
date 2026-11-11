@@ -7,6 +7,7 @@ import {
   forwardChildExit,
   getLocalServerCommand,
   getPortlessAppName,
+  getPortlessPublicUrl,
   openInBrowser,
   portlessBin,
   portlessEnv,
@@ -24,14 +25,14 @@ if (command === portlessBin) {
   ensurePortlessProxy();
   const appName = getPortlessAppName();
 
-  publicUrl = `https://${appName}.localhost`;
+  publicUrl = getPortlessPublicUrl(appName);
   args = [appName, "vite"];
 
   if (appName !== portlessBaseName) {
     console.log(`Starting Portless dev server at ${publicUrl}`);
   }
 } else {
-  const port = await resolvePort(fallbackRequestedPort);
+  const port = await resolvePort(fallbackRequestedPort, fallbackHost);
   const fallbackUrl = `http://${fallbackUrlHost}:${port}`;
 
   args = ["--host", fallbackHost, "--port", String(port), "--strictPort"];
