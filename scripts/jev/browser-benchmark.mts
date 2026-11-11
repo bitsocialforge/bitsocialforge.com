@@ -8,11 +8,11 @@ import { parseArgs, promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import type { Execute } from "./browser-playwright.mts";
-import type { BrowserClient } from "./browser-plan.mts";
-import type { JevClient } from "./client.mts";
-import { createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
+import type { BrowserClient, BrowserDriver, BrowserPlan } from "./browser-plan.mts";
+import type { JevClient, JevRequest, Questions } from "./client.mts";
+import { closeBrowserOnSignal, createPlaywrightDriver, findPlaywrightCli } from "./browser-playwright.mts";
 import { runBrowserPlan, validatePlan } from "./browser-plan.mts";
-import { createJevClient } from "./client.mts";
+import { createJevClient, INPUT_USD_PER_MILLION, JevError } from "./client.mts";
 
 const execute = promisify(execFile);
 export async function readBenchmarkPlan(file: string): Promise<unknown> {
@@ -243,70 +243,163 @@ export async function main(argv = process.argv.slice(2)) {
   if (typeof oldDriver.createPlaywrightDriver !== 'function' || typeof oldPlan.runBrowserPlan !== 'function') throw new Error('invalid_baseline_module');
   const cli = await findPlaywrightCli();
   process.env.PLAYWRIGHT_CLI_BIN = cli;
-  const client = values.jev
+  const clientDeadlineMs = 600_000;
+  const maxInputTokens = 450_000;
+  const clientStarted = Date.now();
+  const sharedClient = values.jev
     ? createJevClient({
         live: true,
         maxRequests,
         maxCostUsd,
-        maxInputTokens: 450_000,
-        deadlineMs: 600_000,
+        maxInputTokens,
+        deadlineMs: clientDeadlineMs,
       })
     : undefined;
-  const model = client?.assertReady().model ?? null;
-  const variants = {
-    old: { createDriver: oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver, runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
-    combined: { createDriver: createPlaywrightDriver, runPlan: runBrowserPlan },
+  const model = sharedClient?.assertReady().model ?? null;
+  // The smallest input-token reserve that the first model request of a run of the current plan has
+  // taken, or would have taken when the budget refused it, so far.
+  let smallestFirstReserve: number | undefined;
+  let runStarting = false;
+  const client: JevClient | undefined = sharedClient && {
+    ...sharedClient,
+    async ask<Q extends Questions>(request: JevRequest<Q>) {
+      const first = runStarting;
+      runStarting = false;
+      const before = sharedClient.stats().reservedInputTokens;
+      let refused: number | undefined;
+      try {
+        return await sharedClient.ask(request);
+      } catch (error) {
+        // A refused request reserves nothing; its error carries the reserve it would have taken.
+        if (error instanceof JevError) refused = error.reserved;
+        throw error;
+      } finally {
+        const reserve = refused ?? sharedClient.stats().reservedInputTokens - before;
+        if (first && reserve > 0)
+          smallestFirstReserve = Math.min(smallestFirstReserve ?? reserve, reserve);
+      }
+    },
   };
-  const runs = [];
-  for (const entry of plans)
-    for (let sample = -warmups; sample < samples; sample++) {
-      const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
-      for (const transport of order) {
-        const result = await benchmarkRun(entry.plan, {
-          ...variants[transport],
-          client,
-          baseline: !values.jev,
-        });
-        const run = {
-          case: entry.id,
-          plan: entry.file,
-          sample: Math.max(sample, 0),
-          warmup: sample < 0,
-          evidence: values.evidence,
-          mode: values.jev ? "jev" : "deterministic",
-          transport,
-          ...result,
-        };
-        runs.push(run);
-        console.error(
-          JSON.stringify({
-            case: run.case,
-            sample,
+  // The shared client's deadline, request count and token and cost reserve never recover. Once the
+  // next run could only launch a browser to fail at its first model request, the benchmark stops
+  // launching it. A used-up deadline or request count stops the benchmark.
+  const clientStopReason = () => {
+    if (!sharedClient) return undefined;
+    if (Date.now() - clientStarted >= clientDeadlineMs) return "deadline_exceeded";
+    return sharedClient.stats().requests >= maxRequests ? "budget_exhausted" : undefined;
+  };
+  // The token and cost reserve is used up for the current plan once the smallest first request of
+  // its runs so far, sent or refused, no longer fits, by the client's own check. The benchmark then
+  // skips the plan's remaining runs and moves on to the next plan, whose first request may be
+  // smaller. Until then, a run whose first request is larger than that smallest one, such as the
+  // other transport's, can still launch a browser that the client refuses at its first request.
+  const planFits = () => {
+    if (!sharedClient || smallestFirstReserve === undefined) return true;
+    const reserved = sharedClient.stats().reservedInputTokens + smallestFirstReserve;
+    return reserved <= maxInputTokens && (reserved * INPUT_USD_PER_MILLION) / 1e6 <= maxCostUsd;
+  };
+  let activeDriver: BrowserDriver | undefined;
+  const tracked =
+    (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
+    (options) =>
+      (activeDriver = create(options));
+  // A retained baseline driver and wrapper may predate interruptible opens: closing them while
+  // the browser is still starting releases the slot and lets the launch finish unowned, and a
+  // second close then fails. Close the baseline driver once, after its open has settled.
+  const trackedBaseline =
+    (create: typeof createPlaywrightDriver): typeof createPlaywrightDriver =>
+    (options) => {
+      const driver = create(options);
+      let opened: Promise<void> = Promise.resolve();
+      let closing: Promise<void> | undefined;
+      return (activeDriver = new Proxy(driver, {
+        get(target, key) {
+          if (key === "open") return (plan: BrowserPlan) => (opened = target.open(plan));
+          if (key === "close")
+            return () => (closing ??= opened.then(() => target.close(), () => target.close()));
+          return Reflect.get(target, key);
+        },
+      }));
+    };
+  const variants = {
+    old: { createDriver: trackedBaseline(oldDriver.createPlaywrightDriver as typeof createPlaywrightDriver), runPlan: oldPlan.runBrowserPlan as typeof runBrowserPlan },
+    combined: { createDriver: tracked(createPlaywrightDriver), runPlan: runBrowserPlan },
+  };
+  const runs: BenchmarkPairRun[] = [];
+  const stop = (reason: string) => {
+    console.log(
+      JSON.stringify(
+        {
+          runs,
+          summary: summarizePairs(runs),
+          interrupted: reason,
+          usage: client?.stats() || null,
+        },
+        null,
+        2,
+      ),
+    );
+    return 2;
+  };
+  let interrupted: string | undefined;
+  const removeSignalHandlers = closeBrowserOnSignal(
+    () => activeDriver,
+    (signal) => {
+      interrupted = signal;
+    },
+  );
+  let exhausted: string | undefined;
+  try {
+    for (const entry of plans) {
+      smallestFirstReserve = undefined;
+      for (let sample = -warmups; sample < samples; sample++) {
+        const order: ('combined' | 'old')[] = (sample + warmups) % 2 ? ['combined', 'old'] : ['old', 'combined'];
+        for (const transport of order) {
+          const reason = interrupted ?? clientStopReason();
+          if (reason) return stop(reason);
+          if (!planFits()) {
+            exhausted = "budget_exhausted";
+            continue;
+          }
+          runStarting = true;
+          const result = await benchmarkRun(entry.plan, {
+            ...variants[transport],
+            client,
+            baseline: !values.jev,
+          });
+          activeDriver = undefined;
+          const run = {
+            case: entry.id,
+            plan: entry.file,
+            sample: Math.max(sample, 0),
+            warmup: sample < 0,
+            evidence: values.evidence,
+            mode: values.jev ? "jev" : "deterministic",
             transport,
-            status: run.status,
-            reason: run.reason,
-            adapterMode: run.adapterMode,
-            lifecycleMs: Math.round(run.lifecycleMs),
-            controlCalls: run.controlCalls,
-          }),
-        );
-        if (["browser_slot_busy", "cleanup_failed"].includes(run.reason)) {
-          console.log(
-            JSON.stringify(
-              {
-                runs,
-                summary: summarizePairs(runs),
-                interrupted: run.reason,
-                usage: client?.stats() || null,
-              },
-              null,
-              2,
-            ),
+            ...result,
+          };
+          runs.push(run);
+          console.error(
+            JSON.stringify({
+              case: run.case,
+              sample,
+              transport,
+              status: run.status,
+              reason: run.reason,
+              adapterMode: run.adapterMode,
+              lifecycleMs: Math.round(run.lifecycleMs),
+              controlCalls: run.controlCalls,
+            }),
           );
-          return 2;
+          if (["browser_slot_busy", "cleanup_failed"].includes(run.reason)) return stop(run.reason);
         }
       }
     }
+    if (interrupted) return stop(interrupted);
+    if (exhausted) return stop(exhausted);
+  } finally {
+    removeSignalHandlers();
+  }
   console.log(
     JSON.stringify(
       {

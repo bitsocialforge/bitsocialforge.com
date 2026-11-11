@@ -47,7 +47,7 @@ node --experimental-strip-types scripts/jev/browser.mts --plan /path/to/plan.jso
 
 Browser helpers use the shared credential configuration above. Keep the key outside the repository and application bundle.
 
-The helper opens and closes its own isolated session through `scripts/pw-session.sh`. A busy shared browser slot returns `incomplete/browser_slot_busy`; retry after its owner finishes. It finds an installed `playwright-cli` in the root, `webui/`, or `packages/admin/`, then PATH. `PLAYWRIGHT_CLI_BIN` can select an existing executable; relative paths resolve from the invocation directory before the session changes directories. It never invokes `npx` or bypasses the lock. `--baseline` requires `--live`; the incomplete result rejects that flag combination when execution was not explicitly enabled.
+The helper opens and closes its own isolated session through `scripts/pw-session.sh`. A busy shared browser slot returns `incomplete/browser_slot_busy`; retry after its owner finishes. SIGINT, SIGTERM or SIGHUP closes the browser and releases the slot before the result reports `incomplete/interrupted`; a second signal exits at once. It finds an installed `playwright-cli` in the root, `webui/`, or `packages/admin/`, then PATH. `PLAYWRIGHT_CLI_BIN` can select an existing executable; relative paths resolve from the invocation directory before the session changes directories. It never invokes `npx` or bypasses the lock. `--baseline` requires `--live`; the incomplete result rejects that flag combination when execution was not explicitly enabled.
 
 This illustrative plan must be adapted to controls actually observed on the target page:
 

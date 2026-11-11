@@ -107,9 +107,10 @@ test("request, byte, secret and spend guards stop before network", async () => {
     createJevClient(options({ maxInputBytes: 10 })).ask({ state: "x", questions }),
     /input_too_large/,
   );
+  // A refused request reserves nothing, but its error reports the reserve it would have taken.
   await assert.rejects(
     createJevClient(options({ maxCostUsd: 0.000001 })).ask({ state: "x", questions }),
-    /budget_exhausted/,
+    { code: "budget_exhausted", reserved: client.stats().reservedInputTokens },
   );
   await assert.rejects(
     createJevClient(options()).ask({ state: "fixture-key", questions }),

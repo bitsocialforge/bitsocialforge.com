@@ -18,10 +18,13 @@ export const JEV_ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 export const INPUT_USD_PER_MILLION = 0.042;
 export class JevError extends Error {
   code: string;
-  constructor(code: string) {
+  // For budget_exhausted: the input tokens the refused request would have reserved.
+  reserved?: number;
+  constructor(code: string, reserved?: number) {
     super(code);
     this.name = 'JevError';
     this.code = code;
+    if (reserved !== undefined) this.reserved = reserved;
   }
 }
 
@@ -180,7 +183,7 @@ export function createJevClient({
       totals.reservedInputTokens + reserved > maxInputTokens ||
       ((totals.reservedInputTokens + reserved) * INPUT_USD_PER_MILLION) / 1e6 > maxCostUsd
     )
-      fail('budget_exhausted');
+      throw new JevError('budget_exhausted', reserved);
     const remaining = deadlineMs - (Date.now() - started);
     if (remaining <= 0) fail('deadline_exceeded');
     totals.requests++;
