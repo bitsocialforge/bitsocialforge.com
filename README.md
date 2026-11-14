@@ -44,7 +44,7 @@ Hosted on Vercel — every push to `master` deploys production at
 ## AI workflow
 
 Agent policy lives in [AGENTS.md](AGENTS.md), with repo-managed skills, hooks,
-and playbooks under `.agents/`, native `.claude/`, `.cursor/`, `.codex/`, and
+and playbooks under `.agents/`, native `.claude/` and `.codex/` files, and
 `docs/agent-playbooks/`.
 
 Shared skills and role sources live in `.agents/`; `yarn ai-workflow:sync` generates native compatibility files. Run `yarn ai-workflow:check` and `yarn ai-workflow:test` after AI workflow edits. `yarn agent:verify` runs the explicit integration and asset checks; lifecycle hooks only format edited files. See [verification guidance](docs/agent-playbooks/verification.md).

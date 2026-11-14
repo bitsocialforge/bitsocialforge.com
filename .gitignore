@@ -2,6 +2,7 @@
 .vercel
 a.txt
 node_modules
+/.cursor/
 dist
 .yarn
 .playwright-cli

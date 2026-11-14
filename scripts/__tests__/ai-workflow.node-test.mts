@@ -17,8 +17,6 @@ function fixture(t: TestContext) {
     ".codex/config.toml",
     ".codex/hooks.json",
     ".codex/hooks",
-    ".cursor/hooks.json",
-    ".cursor/hooks",
     ".claude/settings.json",
     ".claude/hooks",
     "CLAUDE.md",
@@ -47,18 +45,17 @@ test("shared sources generate valid, deterministic harness outputs", (t) => {
   assert.ok(typeof codexReviewer === "string");
   assert.match(codexReviewer, /name = ['"]reviewer['"]/);
   assert.doesNotMatch(codexReviewer, /(?:^|\n)model\s*=/);
-  for (const harness of ["claude", "cursor"]) {
-    assert.equal(
-      readFrontmatter(String(before.get(`.${harness}/agents/reviewer.md`))).metadata.model,
-      undefined,
-    );
-  }
+  assert.equal(
+    readFrontmatter(String(before.get(`.claude/agents/reviewer.md`))).metadata.model,
+    undefined,
+  );
+  assert.equal(fs.existsSync(path.join(root, ".cursor")), false);
 });
 
 test("validation detects a missing agent and obsolete compatibility files", (t) => {
   const root = fixture(t);
   fs.unlinkSync(path.join(root, ".codex/agents/reviewer.toml"));
-  fs.writeFileSync(path.join(root, ".cursor/agents/obsolete.md"), "old role");
+  fs.writeFileSync(path.join(root, ".claude/agents/obsolete.md"), "old role");
   const errors = validateWorkflow(root).errors;
   assert.ok(errors.some((error) => error.includes("reviewer.toml")));
   assert.ok(errors.some((error) => error.includes("Obsolete generated file")));
@@ -113,7 +110,7 @@ test("logical paths use forward slashes and skill assets retain their bytes", (t
 
 test("edit hooks and wrappers reject appended lifecycle commands", (t) => {
   const root = fixture(t);
-  for (const harness of [".codex", ".claude", ".cursor"]) {
+  for (const harness of [".codex", ".claude"]) {
     const configPath = path.join(
       root,
       harness,
@@ -122,12 +119,11 @@ test("edit hooks and wrappers reject appended lifecycle commands", (t) => {
     const original = fs.readFileSync(configPath, "utf8");
     const config = record(JSON.parse(original));
     const hooks = record(config.hooks);
-    const groups = harness === ".cursor" ? hooks.afterFileEdit : hooks.PostToolUse;
+    const groups = hooks.PostToolUse;
     assert.ok(Array.isArray(groups));
     const group = record(groups[0]);
     const handlers = group.hooks;
-    const handler =
-      harness === ".cursor" ? group : record(Array.isArray(handlers) ? handlers[0] : undefined);
+    const handler = record(Array.isArray(handlers) ? handlers[0] : undefined);
     handler.command += "; git fetch --prune";
     fs.writeFileSync(configPath, JSON.stringify(config));
     assert.ok(
@@ -150,7 +146,7 @@ test("role sources reject model settings and invalid sandbox values", (t) => {
   const root = fixture(t);
   const file = path.join(root, ".agents/roles/reviewer.md");
   const original = fs.readFileSync(file, "utf8");
-  for (const key of ["model", "model_reasoning_effort", "claude-model", "cursor-model"]) {
+  for (const key of ["model", "model_reasoning_effort", "claude-model"]) {
     fs.writeFileSync(file, original.replace("name: reviewer", `name: reviewer\n${key}: inherit`));
     assert.throws(() => generatedFiles(root), /Unsupported role field/);
   }
@@ -222,29 +218,26 @@ test("Impeccable pinning writes only canonical sources and preserves unrelated g
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.existsSync(path.join(root, ".agents/skills/audit")), action === "pin");
     assert.equal(fs.readFileSync(generated, "utf8"), "Existing unrelated skill");
-    assert.equal(fs.existsSync(path.join(root, ".cursor/skills")), false);
   }
 });
 
-test("requested Impeccable hook setup uses canonical Cursor files and preserves existing hooks", async (t) => {
+test("requested Impeccable hooks use Claude's local settings and preserve shared hooks", async (t) => {
   const { spawnSync } = await import("node:child_process");
   const root = fixture(t);
-  const file = path.join(root, ".cursor/hooks.json");
-  const original = record(JSON.parse(fs.readFileSync(file, "utf8")));
+  const shared = path.join(root, ".claude/settings.json");
+  const original = fs.readFileSync(shared, "utf8");
   const script = path.join(root, ".agents/skills/impeccable/scripts/hook-admin.mjs");
   const result = spawnSync(process.execPath, [script, "on"], { cwd: root, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  const config = record(JSON.parse(fs.readFileSync(file, "utf8")));
-  const hooks = record(config.hooks);
-  assert.deepEqual(hooks.afterFileEdit, record(original.hooks).afterFileEdit);
-  assert.ok(Array.isArray(hooks.preToolUse));
+  assert.equal(fs.readFileSync(shared, "utf8"), original);
+  const local = path.join(root, ".claude/settings.local.json");
+  const hooks = record(record(JSON.parse(fs.readFileSync(local, "utf8"))).hooks);
+  assert.ok(Array.isArray(hooks.PostToolUse));
+  const handlers = record(hooks.PostToolUse[0]).hooks;
+  assert.ok(Array.isArray(handlers));
   assert.equal(
-    record(hooks.preToolUse[0]).command,
-    'node ".agents/skills/impeccable/scripts/hook-before-edit.mjs"',
-  );
-  assert.equal(
-    fs.existsSync(path.join(root, ".agents/skills/impeccable/scripts/hook-before-edit.mjs")),
-    true,
+    record(handlers[0]).command,
+    'node "${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs"',
   );
 });
 

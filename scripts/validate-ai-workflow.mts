@@ -21,18 +21,16 @@ export function validateWorkflow(root: string) {
       `Generated file missing or drifted: ${relative}; run yarn ai-workflow:sync`,
     );
   }
-  for (const directory of [".claude/skills", ".claude/agents", ".cursor/agents", ".codex/agents"]) {
+  for (const directory of [".claude/skills", ".claude/agents", ".codex/agents"]) {
     for (const relative of listFiles(path.join(root, directory))) {
       const target = path.posix.join(directory, relative);
       check(expected.has(target), `Obsolete generated file: ${target}`);
     }
   }
-  for (const directory of [".codex/skills", ".cursor/skills"]) {
-    check(
-      !fs.existsSync(path.join(root, directory)),
-      `Duplicate skill root: ${directory}; use .agents/skills`,
-    );
-  }
+  check(
+    !fs.existsSync(path.join(root, ".codex/skills")),
+    `Duplicate skill root: .codex/skills; use .agents/skills`,
+  );
 
   let skills = 0;
   for (const relative of listFiles(path.join(root, ".agents/skills"))) {
@@ -62,7 +60,7 @@ export function validateWorkflow(root: string) {
       );
     }
     check(
-      !/\.(?:codex|cursor|claude)\/skills\//.test(body),
+      !/\.(?:codex|claude)\/skills\//.test(body),
       `Skill must reference canonical source paths: ${file}`,
     );
   }
@@ -97,7 +95,7 @@ export function validateWorkflow(root: string) {
         !("model" in agent) && !("model_reasoning_effort" in agent),
         `Codex agents must inherit model settings: ${relative}`,
       );
-    } else if (relative.startsWith(".claude/agents/") || relative.startsWith(".cursor/agents/")) {
+    } else if (relative.startsWith(".claude/agents/")) {
       const { metadata } = readFrontmatter(content.toString(), relative);
       check(
         !("model" in metadata) && !("effort" in metadata),
@@ -107,28 +105,20 @@ export function validateWorkflow(root: string) {
   }
 
   const entries = [
-    [
-      ".codex",
-      "hooks.json",
-      "PostToolUse",
-      'bash "$(git rev-parse --show-toplevel)/.codex/hooks/format.sh"',
-    ],
-    [".claude", "settings.json", "PostToolUse", '"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.sh'],
-    [".cursor", "hooks.json", "afterFileEdit", "./.cursor/hooks/format.sh"],
+    [".codex", "hooks.json", 'bash "$(git rev-parse --show-toplevel)/.codex/hooks/format.sh"'],
+    [".claude", "settings.json", '"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.sh'],
   ] as const;
   const wrapper =
     '#!/bin/bash\n\nrepo_root="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 1\nexec node --experimental-strip-types --disable-warning=ExperimentalWarning "$repo_root/scripts/agent-hooks/format.mts"\n';
-  for (const [harness, filename, event, command] of entries) {
+  for (const [harness, filename, command] of entries) {
     const entry = `${harness}/${filename}`;
     const document = record(JSON.parse(read(entry)));
     const hooks = record(document.hooks);
-    if (harness === ".cursor")
-      check(document.version === 1, "Cursor hook configuration requires version 1");
     check(
-      document.hooks && Object.keys(hooks).length === 1 && event in hooks,
+      document.hooks && Object.keys(hooks).length === 1 && "PostToolUse" in hooks,
       `Only lightweight edit hooks belong in ${entry}; no Stop or automatic install hooks`,
     );
-    const groups = hooks[event];
+    const groups = hooks.PostToolUse;
     check(Array.isArray(groups) && groups.length === 1, `Expected one edit hook group in ${entry}`);
     if (!Array.isArray(groups)) continue;
     for (const candidate of groups) {
@@ -140,7 +130,7 @@ export function validateWorkflow(root: string) {
           group.matcher === "Edit|Write|MultiEdit",
           "Claude edit hook must match supported edit tools",
         );
-      const handlers = harness === ".cursor" ? [group] : group.hooks;
+      const handlers = group.hooks;
       check(
         Array.isArray(handlers) && handlers.length === 1,
         `Expected one formatter handler in ${entry}`,
@@ -149,11 +139,10 @@ export function validateWorkflow(root: string) {
       for (const candidate of handlers) {
         const handler = record(candidate);
         check(handler.command === command, `Hook must call only its formatter wrapper: ${entry}`);
-        if (harness !== ".cursor")
-          check(
-            handler.type === "command" && handler.timeout === 10,
-            `Invalid formatter handler schema: ${entry}`,
-          );
+        check(
+          handler.type === "command" && handler.timeout === 10,
+          `Invalid formatter handler schema: ${entry}`,
+        );
       }
     }
     check(

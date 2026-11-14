@@ -49,7 +49,7 @@ protocol** — copy on the site must never blur that line.
 
 ## Skills, tools, and delegation
 
-- Shared skills live in `.agents/skills/`; `.agents/roles/` is this repository’s generator source format. The generator writes native `.claude/skills/`, `.codex/agents/*.toml`, and `.cursor/agents/*.md` / `.claude/agents/*.md`. See [skills-and-tools.md](docs/agent-playbooks/skills-and-tools.md).
+- Shared skills live in `.agents/skills/`; `.agents/roles/` is this repository’s generator source format. The generator writes native `.claude/skills/`, `.codex/agents/*.toml`, and `.claude/agents/*.md`. See [skills-and-tools.md](docs/agent-playbooks/skills-and-tools.md).
 - Omit model and reasoning fields from committed skills and roles. Let the app, user settings, and supported runtime overrides choose or inherit them. Do not invent a universal “latest” alias.
 - Keep harness-specific permissions, hooks, and metadata explicit. Equal content does not prove equal runtime behavior.
 - Delegate substantial independent work when it improves speed, context isolation, or review. Small and coupled changes can remain local; use built-in workers where available instead of a compulsory specialist chain.

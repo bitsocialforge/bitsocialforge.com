@@ -17,16 +17,15 @@ Commit the shared sources and resulting native files together. The check detects
 | App | Skills | Custom agents | Project instructions |
 |---|---|---|---|
 | Codex | `.agents/skills/<name>/SKILL.md` | Generated `.codex/agents/*.toml` | Root and scoped `AGENTS.md` |
-| Cursor | `.agents/skills/<name>/SKILL.md` | Generated `.cursor/agents/*.md` | `AGENTS.md`; `.cursor/rules` remains available for conditional rules |
 | Claude Code | Generated `.claude/skills/<name>/SKILL.md` | Generated `.claude/agents/*.md` | `CLAUDE.md` imports `@AGENTS.md` |
 
-Official references: [Codex skills](https://learn.chatgpt.com/docs/build-skills), [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Cursor skills](https://cursor.com/docs/skills), [Cursor agents](https://cursor.com/docs/subagents), [Cursor rules](https://cursor.com/docs/rules), [Claude skills](https://code.claude.com/docs/en/skills), [Claude agents](https://code.claude.com/docs/en/sub-agents), and [Claude memory imports](https://code.claude.com/docs/en/memory).
+Official references: [Codex skills](https://learn.chatgpt.com/docs/build-skills), [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Claude skills](https://code.claude.com/docs/en/skills), [Claude agents](https://code.claude.com/docs/en/sub-agents), and [Claude memory imports](https://code.claude.com/docs/en/memory).
 
-The source role fields are `name`, `description`, and optional `sandbox-mode`. The generator renders the name, description, and instructions in each native schema. A read-only role gets Codex `sandbox_mode`, Cursor `readonly`, and Claude’s Bash/Read/Grep/Glob tool list. Claude’s tool list is not an OS sandbox: the instructions still prohibit mutations.
+The source role fields are `name`, `description`, and optional `sandbox-mode`. The generator renders the name, description, and instructions in each native schema. A read-only role gets Codex `sandbox_mode` and Claude’s Bash/Read/Grep/Glob tool list. Claude’s tool list is not an OS sandbox: the instructions still prohibit mutations.
 
 Model and reasoning fields are omitted from skills and agent definitions. The app, user settings, and supported invocation overrides choose or inherit them. This avoids generation-specific pins without promising that inheritance dynamically selects the best model. The generator rejects source role model fields.
 
-Keep hook configuration, permissions, plugin settings, and launch metadata native; they are not interchangeable. See [hooks-setup.md](hooks-setup.md). Workflow tests establish parsed schemas, deterministic generation, and hook behavior using disposable fixtures; they do not prove end-to-end delegation in each installed app. Trust settings and app discovery/reload behavior still apply. Cursor can also discover Claude compatibility skill directories; its published precedence for duplicate names is unspecified.
+Keep hook configuration, permissions, plugin settings, and launch metadata native; they are not interchangeable. See [hooks-setup.md](hooks-setup.md). Workflow tests establish parsed schemas, deterministic generation, and hook behavior using disposable fixtures; they do not prove end-to-end delegation in each installed app. Trust settings and app discovery/reload behavior still apply.
 
 ## Maintaining instructions
 
