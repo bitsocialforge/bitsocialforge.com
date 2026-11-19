@@ -64,6 +64,7 @@ protocol** — copy on the site must never blur that line.
 | Change | Guidance and verification |
 |---|---|
 | Design, layout, typography, color, or motion | Use relevant `impeccable` guidance; for new surfaces, use `frontend-design`. Preserve the Brand and Content Rules above |
+| Choosing a native control, focus behavior, browser API, or browser-sensitive layout | Consult [Modern Web Guidance](.agents/skills/modern-web-guidance/SKILL.md) for the relevant feature |
 | UI behavior or layout | Check the affected flow in an isolated browser, console, local assets, desktop and 375px mobile; choose engines using [verification.md](docs/agent-playbooks/verification.md) |
 | Public copy | Recheck brand/product claims and keep title, meta description, and OG text consistent |
 | Code, automation, or build | Select affected checks using [verification.md](docs/agent-playbooks/verification.md); `yarn agent:verify` is the explicit integration pass |
