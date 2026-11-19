@@ -39,6 +39,7 @@
     "agentation": "3.0.2",
     "cross-spawn": "7.0.6",
     "js-yaml": "4.3.2",
+    "modern-web-guidance": "1.0.0",
     "oxfmt": "0.57.0",
     "oxlint": "1.72.0",
     "smol-toml": "1.9.0",
